@@ -1,0 +1,13 @@
+/* Стили для переопределения отступов */
+@media (min-width: 1024px) {
+  .lg\:px-10 {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .md\:pt-10 {
+    padding-top: 0 !important;
+  }
+} 

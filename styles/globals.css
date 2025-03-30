@@ -1,0 +1,474 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Onest:wght@100..900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 10% 3.9%;
+
+    --radius: 0.5rem;
+
+    --chart-1: 12 76% 61%;
+
+    --chart-2: 173 58% 39%;
+
+    --chart-3: 197 37% 24%;
+
+    --chart-4: 43 74% 66%;
+
+    --chart-5: 27 87% 67%;
+  }
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+html,
+body,
+main {
+    height: 100%;
+}
+
+body {
+    font-family: "Inter", serif;
+    @apply bg-background text-foreground;
+}
+
+* {
+  @apply border-border;
+}
+
+.header-logo span {
+    font-family: "Onest", serif;
+}
+
+/* Styles for the "How can AI gastroenterologist help?" section */
+section h2 {
+    font-family: "Onest", serif;
+}
+
+section p.text-lg, 
+section p.md\:text-\[28px\] {
+    font-family: "Onest", serif;
+}
+
+h1 {
+    color: #363748;
+    text-align: center;
+    font-family: Onest;
+    font-size: 60px;
+    font-style: normal;
+    font-weight: 600;
+    line-height: 67px; /* 111.667% */
+    letter-spacing: 0.18px;
+}
+
+h2 {
+    color: var(--Gray-100, #1B1B1B);
+    font-family: Inter;
+    font-size: 16px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 24px; /* 150% */
+}
+
+h1 + p, h2 + p {
+    color: #393838;
+    text-align: center;
+    font-family: Inter;
+    font-size: 21px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 32px; /* 152.381% */
+    letter-spacing: 0.263px;
+}
+
+/* Custom classes */
+.bg-linear-to-b {
+    background-image: linear-gradient(to bottom, var(--tw-gradient-stops));
+}
+
+/* Custom spacing utilities */
+.size-4 {
+    width: 1rem;
+    height: 1rem;
+}
+
+.size-6 {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.size-8.5 {
+    width: 2.125rem;
+    height: 2.125rem;
+}
+
+.size-12 {
+    width: 3rem;
+    height: 3rem;
+}
+
+.size-28 {
+    width: 7rem;
+    height: 7rem;
+}
+
+.min-w-8.5 {
+    min-width: 2.125rem;
+}
+
+.min-w-37.5 {
+    min-width: 9.375rem;
+}
+
+.min-w-52 {
+    min-width: 13rem;
+}
+
+.max-w-64.5 {
+    max-width: 16.125rem;
+}
+
+.max-w-80 {
+    max-width: 20rem;
+}
+
+.max-w-110 {
+    max-width: 27.5rem;
+}
+
+.max-w-135 {
+    max-width: 33.75rem;
+}
+
+.max-w-181 {
+    max-width: 45.25rem;
+}
+
+.max-w-190.5 {
+    max-width: 47.625rem;
+}
+
+.max-w-227.5 {
+    max-width: 56.875rem;
+}
+
+.max-w-320 {
+    max-width: 80rem;
+}
+
+.w-37.5 {
+    width: 9.375rem;
+}
+
+.h-7.5 {
+    height: 1.875rem;
+}
+
+.pt-5.5 {
+    padding-top: 1.375rem;
+}
+
+.mt-5.5 {
+    margin-top: 1.375rem;
+}
+
+.mt-7.5 {
+    margin-top: 1.875rem;
+}
+
+.pb-15 {
+    padding-bottom: 3.75rem;
+}
+
+.pt-15 {
+    padding-top: 3.75rem;
+}
+
+.py-17.5 {
+    padding-top: 4.375rem;
+    padding-bottom: 4.375rem;
+}
+
+.px-6.5 {
+    padding-left: 1.625rem;
+    padding-right: 1.625rem;
+}
+
+.px-8.5 {
+    padding-left: 2.125rem;
+    padding-right: 2.125rem;
+}
+
+.pb-30 {
+    padding-bottom: 7.5rem;
+}
+
+.leading-4.5 {
+    line-height: 1.125rem;
+}
+
+.rounded-5 {
+    border-radius: 1.25rem;
+}
+
+.mb-5px {
+    margin-bottom: 5px;
+}
+
+.gap-0.25 {
+    gap: 0.0625rem;
+}
+
+@media(max-width: 1023px) {
+    br {
+        display: none;
+    }
+}
+
+/* Анимация подсветки найденного сообщения */
+.bg-yellow-100 {
+  animation: highlight-message 1.5s ease;
+}
+
+@keyframes highlight-message {
+  0% {
+    background-color: rgba(254, 240, 138, 0.8); /* Яркий желтый */
+  }
+  70% {
+    background-color: rgba(254, 240, 138, 0.8); /* Поддерживаем яркость */
+  }
+  100% {
+    background-color: rgba(254, 240, 138, 0); /* Возвращаемся к нормальному */
+  }
+}
+
+/* NProgress стили */
+#nprogress {
+  pointer-events: none;
+}
+
+#nprogress .bar {
+  background: #2563eb;
+  position: fixed;
+  z-index: 9999;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+}
+
+#nprogress .peg {
+  display: block;
+  position: absolute;
+  right: 0px;
+  width: 100px;
+  height: 100%;
+  box-shadow: 0 0 10px #2563eb, 0 0 5px #2563eb;
+  opacity: 1.0;
+  transform: rotate(3deg) translate(0px, -4px);
+}
+
+/* Анимация для плавного раскрытия аккордеонов - базовые стили */
+details > div {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+  opacity: 0;
+}
+
+/* Анимация для плавного появления текста при стриминге */
+@keyframes streamFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+    color: #4f96ff;
+  }
+  70% {
+    opacity: 1;
+    color: #4f96ff;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    color: inherit;
+  }
+}
+
+.stream-fade-in {
+  animation: streamFadeIn 0.5s ease-out forwards;
+  display: inline; /* Слова должны идти друг за другом в строке */
+  will-change: transform, opacity, color; /* Оптимизация производительности */
+  white-space: pre-wrap; /* Сохраняем пробелы */
+  word-break: normal; /* Не разрываем слова */
+}
+
+details[open] > div {
+  /* JS будет устанавливать точную высоту - эти стили для запасного варианта */
+  max-height: 500px; 
+  opacity: 1;
+}
+
+/* Анимация раскрытия меню в футере */
+.footer-item .overflow-hidden {
+  transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+.footer-item .max-h-0 {
+  opacity: 0;
+}
+
+.footer-item .max-h-96 {
+  opacity: 1;
+}
+
+/* Стили для плавной анимации в футере */
+.footer-item ul {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+.footer-item.active ul {
+  /* Значение будет устанавливаться динамически через JavaScript */
+  opacity: 1;
+}
+
+/* Стили для переопределения отступов */
+@media (min-width: 1024px) {
+  .lg\:px-10 {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .md\:pt-10 {
+    padding-top: 0 !important;
+  }
+}
+
+
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Markdown styling */
+.markdown-content, .markdown-formatted {
+  @apply text-sm sm:text-base whitespace-normal break-normal;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+.markdown-content h1, .markdown-formatted h1 {
+  @apply text-xl font-bold mb-2 mt-4;
+}
+
+.markdown-content h2, .markdown-formatted h2 {
+  @apply text-lg font-bold mb-2 mt-3;
+}
+
+.markdown-content h3, .markdown-formatted h3 {
+  @apply text-base font-bold mb-2 mt-3;
+}
+
+.markdown-content p, .markdown-formatted p {
+  @apply mb-3;
+}
+
+.markdown-content ul, .markdown-formatted ul {
+  @apply list-disc pl-5 mb-3;
+}
+
+.markdown-content ol, .markdown-formatted ol {
+  @apply list-decimal pl-5 mb-3;
+}
+
+.markdown-content li, .markdown-formatted li {
+  @apply mb-1;
+}
+
+.markdown-content strong, 
+.markdown-content b,
+.markdown-formatted strong,
+.markdown-formatted b {
+  @apply font-bold;
+}
+
+.markdown-content em, 
+.markdown-content i,
+.markdown-formatted em,
+.markdown-formatted i {
+  @apply italic;
+}
+
+.markdown-content a, .markdown-formatted a {
+  @apply text-blue-500 underline;
+}
+
+.markdown-content blockquote, .markdown-formatted blockquote {
+  @apply pl-4 border-l-4 border-gray-300 italic my-3;
+}
+
+.markdown-content code, .markdown-formatted code {
+  @apply bg-gray-100 px-1 py-0.5 rounded font-mono text-sm;
+}
