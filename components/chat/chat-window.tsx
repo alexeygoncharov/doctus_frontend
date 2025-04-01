@@ -19,7 +19,7 @@ import {
 import { ChatMessage } from "./chat-message";
 import { Input } from "../../components/ui/input";
 import { SendIcon, Clock, ShieldCheck, Brain, User, Stethoscope, Search, Upload, Camera, MessageSquare } from "lucide-react";
-import { Avatar, AvatarImage, AvatarFallback } from "../../components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "../../components/ui/avatar"; // Ensure AvatarImage is imported
 import { PlusBadge } from "../../components/doctors/plus-badge";
 import { CameraModal } from "./camera-modal";
 import { ScrollArea } from "../../components/ui/scroll-area";
@@ -102,13 +102,11 @@ const EmptyChatState = ({
               <Avatar className="h-10 w-10 shrink-0 relative bg-blue-100">
                 <AvatarImage 
                   alt={doctor.name}
-                  src={doctor.avatar && doctor.avatar.startsWith('http') ? doctor.avatar : `${process.env.NEXT_PUBLIC_API_URL || ''}${doctor.avatar}`}
+                  // Safely construct src for header avatar
+                  src={doctor.avatar ? (doctor.avatar.startsWith('http') ? doctor.avatar : `${process.env.NEXT_PUBLIC_API_URL || ''}${doctor.avatar}`) : ''}
                   draggable="false"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    console.error("Failed to load doctor avatar in header");
-                    target.onerror = null;
-                  }}
+                  width={40} // Explicit size for header avatar
+                  height={40}
                 />
                 <AvatarFallback className="bg-gradient-to-br from-blue-100 to-blue-200 text-blue-700">
                   <User className="h-5 w-5" />
@@ -134,13 +132,11 @@ const EmptyChatState = ({
             <Avatar className="h-8 w-8 shrink-0 relative bg-blue-100">
               <AvatarImage 
                 alt={doctor.name}
-                src={doctor.avatar && doctor.avatar.startsWith('http') ? doctor.avatar : `${process.env.NEXT_PUBLIC_API_URL || ''}${doctor.avatar}`}
+                // Safely construct src for mobile header avatar
+                 src={doctor.avatar ? (doctor.avatar.startsWith('http') ? doctor.avatar : `${process.env.NEXT_PUBLIC_API_URL || ''}${doctor.avatar}`) : ''}
                 draggable="false"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  console.error("Failed to load doctor avatar in mobile header");
-                  target.onerror = null;
-                }}
+                 width={32} // Explicit size for mobile header avatar
+                 height={32}
               />
               <AvatarFallback className="bg-gradient-to-br from-blue-100 to-blue-200 text-blue-700">
                 <User className="h-4 w-4" />
@@ -163,26 +159,23 @@ const EmptyChatState = ({
         <div className="max-w-md">
           <div className="flex justify-center w-full mb-4">
             <div className="relative">
-              <span className="flex shrink-0 overflow-hidden rounded-full h-16 w-16 relative bg-blue-100">
-                {doctor.avatar ? (
-                  <img 
-                    src={doctor.avatar.startsWith('http') ? doctor.avatar : `${process.env.NEXT_PUBLIC_API_URL || ''}${doctor.avatar}`} 
-                    alt={doctor.name} 
-                    className="h-full w-full object-cover"
-                    draggable="false"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      console.error("Failed to load doctor image:", doctor.avatar);
-                      target.onerror = null; // Prevent infinite loop
-                      target.src = '/file-icons/image.svg';
-                    }}
-                  />
-                ) : (
-                  <span className="flex h-full w-full items-center justify-center rounded-full bg-muted bg-gradient-to-br from-blue-100 to-blue-200 text-blue-700">
-                    <User className="h-8 w-8" />
-                  </span>
-                )}
-              </span>
+                {/* Use Avatar and AvatarImage for optimized display and fallback */}
+                <Avatar className="h-16 w-16 shrink-0 relative bg-blue-100"> {/* Increased size */} 
+                   <AvatarImage 
+                     // Construct the src safely, ensuring doctor and avatar exist
+                     src={doctor?.avatar ? (doctor.avatar.startsWith('http') ? doctor.avatar : `${process.env.NEXT_PUBLIC_API_URL || ''}${doctor.avatar}`) : ''} 
+                     alt={doctor?.name || 'Doctor avatar'} // Provide a default alt text
+                     width={64} // Match the parent size
+                     height={64}
+                     className="h-full w-full object-cover" // Ensure the image covers the area
+                     draggable="false"
+                     // Error handling is now inside AvatarImage component
+                   />
+                   {/* Fallback shown if AvatarImage returns null (e.g., on error or no src) */}
+                   <AvatarFallback className="bg-gradient-to-br from-blue-100 to-blue-200 text-blue-700">
+                     <User className="h-8 w-8" />
+                   </AvatarFallback>
+                 </Avatar>
               <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white online-indicator"></span>
             </div>
           </div>
@@ -1271,11 +1264,8 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
                       alt={doctor.name} // Доктор точно не null
                       src={doctor.avatar && doctor.avatar.startsWith('http') ? doctor.avatar : `${process.env.NEXT_PUBLIC_API_URL || ''}${doctor.avatar}`}
                       draggable="false"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        console.error("Failed to load doctor avatar in header");
-                        target.onerror = null;
-                      }}
+                       width={40} // Added width
+                       height={40} // Added height
                     />
                     <AvatarFallback className="bg-gradient-to-br from-blue-100 to-blue-200 text-blue-700">
                       <User className="h-5 w-5" />
@@ -1338,11 +1328,8 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
                       alt={doctor.name} // Доктор точно не null
                       src={doctor.avatar && doctor.avatar.startsWith('http') ? doctor.avatar : `${process.env.NEXT_PUBLIC_API_URL || ''}${doctor.avatar}`}
                       draggable="false"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        console.error("Failed to load doctor avatar in mobile header");
-                        target.onerror = null;
-                      }}
+                      width={32} // Added width
+                      height={32} // Added height
                     />
                     <AvatarFallback className="bg-gradient-to-br from-blue-100 to-blue-200 text-blue-700">
                       <User className="h-4 w-4" />
