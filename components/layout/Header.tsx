@@ -2,16 +2,16 @@ import React, { useState, useEffect, useContext } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { useSession, signOut } from 'next-auth/react';
 import { AvatarContext } from '@/pages/_app';
 import { getBackendUrl } from '@/lib/api';
 import { getDoctors } from '@/lib/api';
 import { Doctor, mapApiDoctorToUi } from '@/lib/doctors';
+import { useAuth } from '@/lib/auth-context';
 
 const Header: React.FC = () => {
   const router = useRouter();
-  const { data: session, status } = useSession();
-  const isLoggedIn = status === 'authenticated';
+  const { user, token, logout } = useAuth();
+  const isLoggedIn = !!token;
   const [isSticky, setIsSticky] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -337,31 +337,31 @@ const Header: React.FC = () => {
             <div className="group/profile flex items-center gap-2 bg-blue-50 sm:bg-white pr-3 sm:pr-0 rounded-2xl sm:rounded-none relative"> {/* Added group/profile */}
               <Link href="/settings" className="flex items-center gap-2">
                 <div className="size-8.5 min-w-8.5 sm:size-12 sm:min-w-12 rounded-full overflow-hidden">
-                  {(avatarUrl || localStorageAvatar || session?.user?.image) ? (
+                  {(avatarUrl || localStorageAvatar || user?.avatar) ? (
                     <Image 
                       src={
                         avatarUrl && avatarUrl.startsWith('http') 
                           ? avatarUrl 
                           : localStorageAvatar && localStorageAvatar.startsWith('http')
                             ? localStorageAvatar
-                            : session?.user?.image && session.user.image.startsWith('http')
-                              ? session.user.image
-                              : getBackendUrl(avatarUrl || localStorageAvatar || session?.user?.image || '')
+                            : user?.avatar && user.avatar.startsWith('http')
+                              ? user.avatar
+                              : getBackendUrl(avatarUrl || localStorageAvatar || user?.avatar || '')
                       } 
-                      alt={session?.user?.name || 'Пользователь'} 
+                      alt={user?.name || 'Пользователь'} 
                       className="object-cover size-full rounded-full" 
                       width={48} 
                       height={48} 
                     />
                   ) : (
                     <div className="size-full bg-blue-100 flex items-center justify-center text-blue-500 rounded-full">
-                      {session?.user?.name?.[0].toUpperCase() || 'U'}
+                      {user?.name?.[0].toUpperCase() || 'U'}
                     </div>
                   )}
                 </div>
                 <div className="hidden sm:flex flex-col gap-0.25">
-                  <p className="font-medium text-sm">{session?.user?.name || 'Пользователь'}</p>
-                  <span className="text-xs text-[#64748B]">{session?.user?.email}</span>
+                  <p className="font-medium text-sm">{user?.name || 'Пользователь'}</p>
+                  <span className="text-xs text-[#64748B]">{user?.email}</span>
                 </div>
               </Link>
               <span 
@@ -442,7 +442,7 @@ const Header: React.FC = () => {
                 </li>
                 <li className="px-1 border-solid border-slate-200/60 first:pt-1 last:pb-1 last:border-t">
                   <button 
-                    onClick={() => signOut({ callbackUrl: '/' })}
+                    onClick={() => logout()}
                     className="flex items-center w-48 group transition text-slate-600 hover:text-blue-500 text-sm py-1.5 px-2 gap-x-2"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" className="stroke-slate-600 transition group-hover:stroke-blue-500">

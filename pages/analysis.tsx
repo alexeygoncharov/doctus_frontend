@@ -4,24 +4,32 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { CameraModal } from '../components/chat/camera-modal';
+import { FileData } from '../lib/types';
 
 // Импорт API функций для работы с файлами и чатами
 import { analyzeFile, analyzeMultipleFiles, uploadChatFiles, createChat, sendMessage } from '../lib/api';
 
+interface CapturedImage {
+  name: string;
+  size: number;
+  type: string;
+  url: string;
+}
+
 export default function Analysis() {
   const router = useRouter();
   const [isFileHover, setIsFileHover] = useState(false);
-  const [files, setFiles] = useState([]);
+  const [files, setFiles] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [uploadError, setUploadError] = useState("");
-  const fileInputRef = useRef(null);
-  const cameraInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Обработчик загрузки файлов
-  const handleFileChange = async (event) => {
-    if (event.target.files?.length > 0) {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files.length > 0) {
       try {
         setIsUploading(true);
         setUploadProgress(10);
@@ -52,11 +60,11 @@ export default function Analysis() {
   };
 
   // Обработчик перетаскивания файлов
-  const handleFileDrop = async (event) => {
+  const handleFileDrop = async (event: React.DragEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsFileHover(false);
     
-    if (event.dataTransfer.files?.length > 0) {
+    if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
       try {
         setIsUploading(true);
         setUploadProgress(10);
@@ -92,14 +100,14 @@ export default function Analysis() {
   };
 
   // Обработчик для полученных фотографий с камеры
-  const handleCapturedImages = async (capturedImages) => {
+  const handleCapturedImages = async (capturedImages: CapturedImage[]) => {
     try {
       setIsUploading(true);
       setUploadProgress(10);
       
       if (capturedImages.length > 0) {
         // Для каждого изображения получаем File из URL
-        const imageFiles = await Promise.all(capturedImages.map(async (img, index) => {
+        const imageFiles = await Promise.all(capturedImages.map(async (img: CapturedImage, index: number) => {
           const response = await fetch(img.url);
           const blob = await response.blob();
           const file = new File([blob], `camera_image_${index+1}.jpg`, { type: 'image/jpeg' });
@@ -129,7 +137,7 @@ export default function Analysis() {
   };
 
   // Обработчик для начала анализа и перехода в чат
-  const handleStartAnalysis = async (fileList) => {
+  const handleStartAnalysis = async (fileList: Array<any>) => {
     try {
       setIsUploading(true);
       
@@ -138,19 +146,19 @@ export default function Analysis() {
       const chat = await createChat(doctorId);
       
       // Получаем ID файлов для отправки в сообщении
-      const fileIds = fileList.map(file => file.id);
+      const fileIds = fileList.map((file: any) => file.id);
       
       console.log("Sending message with files:", {
         doctorId,
         chatId: chat.id,
         fileIds,
-        fileNames: fileList.map(file => file.name)
+        fileNames: fileList.map((file: any) => file.name)
       });
       
       // Сохраняем файлы в localStorage для восстановления в чате
       try {
         // Преобразуем объекты файлов в сериализуемый формат
-        const filesForStorage = fileList.map(file => ({
+        const filesForStorage = fileList.map((file: any) => ({
           id: file.id,
           name: file.name,
           size: file.size,
@@ -160,7 +168,7 @@ export default function Analysis() {
         
         // Сохраняем в глобальной переменной для прямого доступа
         if (typeof window !== 'undefined') {
-          window._lastUploadedFiles = filesForStorage;
+          (window as any)._lastUploadedFiles = filesForStorage;
         }
         
         // Сохраняем в localStorage для долгосрочного хранения

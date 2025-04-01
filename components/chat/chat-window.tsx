@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { useSession } from "next-auth/react";
 import { Doctor } from "../../lib/doctors";
 import { Message as ImportedMessage, FileData } from "../../lib/types";
 import { 
@@ -24,6 +23,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "../../components/ui/avatar"
 import { PlusBadge } from "../../components/doctors/plus-badge";
 import { CameraModal } from "./camera-modal";
 import { ScrollArea } from "../../components/ui/scroll-area";
+import { useAuth } from "@/lib/auth-context";
 
 // Локальный интерфейс Message, расширяющий импортированный или определяющий заново
 // Используем `as ImportedMessage` для импорта, чтобы избежать конфликта имен
@@ -102,7 +102,7 @@ const EmptyChatState = ({
               <Avatar className="h-10 w-10 shrink-0 relative bg-blue-100">
                 <AvatarImage 
                   alt={doctor.name}
-                  src={doctor.avatar && doctor.avatar.startsWith('http') ? doctor.avatar : `http://localhost:8000${doctor.avatar}`}
+                  src={doctor.avatar && doctor.avatar.startsWith('http') ? doctor.avatar : `${process.env.NEXT_PUBLIC_API_URL || ''}${doctor.avatar}`}
                   draggable="false"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
@@ -134,7 +134,7 @@ const EmptyChatState = ({
             <Avatar className="h-8 w-8 shrink-0 relative bg-blue-100">
               <AvatarImage 
                 alt={doctor.name}
-                src={doctor.avatar && doctor.avatar.startsWith('http') ? doctor.avatar : `http://localhost:8000${doctor.avatar}`}
+                src={doctor.avatar && doctor.avatar.startsWith('http') ? doctor.avatar : `${process.env.NEXT_PUBLIC_API_URL || ''}${doctor.avatar}`}
                 draggable="false"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
@@ -166,7 +166,7 @@ const EmptyChatState = ({
               <span className="flex shrink-0 overflow-hidden rounded-full h-16 w-16 relative bg-blue-100">
                 {doctor.avatar ? (
                   <img 
-                    src={doctor.avatar.startsWith('http') ? doctor.avatar : `http://localhost:8000${doctor.avatar}`} 
+                    src={doctor.avatar.startsWith('http') ? doctor.avatar : `${process.env.NEXT_PUBLIC_API_URL || ''}${doctor.avatar}`} 
                     alt={doctor.name} 
                     className="h-full w-full object-cover"
                     draggable="false"
@@ -287,7 +287,7 @@ const EmptyChatState = ({
 };
 
 export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
-  const { data: session } = useSession();
+  const { user, token } = useAuth();
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -306,8 +306,8 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
   useEffect(() => {
     const isDecodeDoctor = typeof doctor === 'object' && doctor !== null && doctor.id.toString() === '20'; // Добавлена проверка doctor !== null
 
-    // Проверка 1: Нет сессии (и это не доктор Расшифровка)
-    if (!isDecodeDoctor && (!session || !session.access_token)) {
+    // Проверка 1: Нет токена авторизации (и это не доктор Расшифровка)
+    if (!isDecodeDoctor && !token) {
       console.log("useEffect skipped: No active session"); // Для отладки
       setIsLoadingHistory(false); // Выключаем загрузчик
       // Не очищаем сообщения здесь, чтобы избежать моргания при логине
@@ -416,9 +416,9 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
 
         // --- Логика получения userChats ---
         let userChats: any[] | null = null;
-        if (isDecodeDoctor || (session && session.access_token)) { // Загружаем чаты только если есть сессия или это доктор Расшифровка
+        if (isDecodeDoctor || token) { // Загружаем чаты только если есть токен или это доктор Расшифровка
            try {
-             userChats = await getUserChats(); // getUserChats должен использовать токен из session внутри
+             userChats = await getUserChats(); // getUserChats должен использовать токен из localStorage
              if (!userChats || !Array.isArray(userChats)) {
                console.error("Invalid user chats response:", userChats);
                userChats = []; // Считаем, что чатов нет
@@ -429,8 +429,8 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
              // Не прерываемся, позволяем создать новый чат, если нужно
            }
         } else {
-          // На всякий случай, если до сюда дошли без сессии (хотя проверка выше должна была отсечь)
-          console.warn("Attempting to load history without session (should not happen)");
+          // На всякий случай, если до сюда дошли без токена (хотя проверка выше должна была отсечь)
+          console.warn("Attempting to load history without authentication (should not happen)");
           userChats = [];
         }
         // --- Конец логики получения userChats ---
@@ -452,7 +452,7 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
 
           if (!chatMessages || !Array.isArray(chatMessages)) {
             console.error("Invalid chat messages response:", chatMessages);
-            // Не очищаем сообщения, если уже есть восстановленные из кеша
+            // Не очищаем сообщения, если есть восстановленные из кеша
             if (!messages.some(m => m.id.startsWith('cached-'))) {
               setMessages([]);
             }
@@ -508,7 +508,7 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
     loadChatHistory();
   // Добавляем chatId в зависимости, так как он используется в логике восстановления файлов и загрузки истории
   // Добавляем setChatId как зависимость
-  }, [doctor, session, setMessages, historyAttempted, chatId, setChatId]); 
+  }, [doctor, token, setMessages, historyAttempted, chatId, setChatId]); 
 
 
   // Function to scroll to bottom of chat
@@ -544,9 +544,9 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
   
   // Debug chat history messages with files
   useEffect(() => {
-    if (messages.some(msg => msg.files?.length > 0)) { // Исправлено: Опциональная цепочка (Line 547)
+    if (messages.some(msg => msg.files && msg.files.length > 0)) { // Исправлено: Более безопасная проверка
       console.log("CHAT HISTORY DEBUG - Messages with files:", 
-        messages.filter(msg => msg.files?.length > 0).map(msg => ({ // Исправлено: Опциональная цепочка (Line 549)
+        messages.filter(msg => msg.files && msg.files.length > 0).map(msg => ({ // Исправлено: Более безопасная проверка
           id: msg.id,
           role: msg.role,
           content: msg.content.substring(0, 30) + "...",
@@ -570,7 +570,7 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
     const isDecodeDoctor = doctor.id.toString() === '20';
     
     // Проверяем авторизацию (кроме доктора "Расшифровка")
-    if (!session && !isDecodeDoctor) {
+    if (!token && !isDecodeDoctor) {
       alert("Пожалуйста, авторизуйтесь для отправки сообщений");
       setIsLoading(false);
       return;
@@ -579,7 +579,7 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
     // Проверяем, доступен ли врач для текущей подписки
     // Доктор "Расшифровка" доступен без подписки и авторизации
     // @ts-ignore // Игнорируем ошибку TS, предполагая, что тип Session расширен
-    if (!isDecodeDoctor && doctor.isPremium && session?.user?.subscription?.plan?.type !== 'premium') { 
+    if (!isDecodeDoctor && doctor.isPremium && user?.subscription?.plan?.type !== 'premium') { 
       // Показываем сообщение о необходимости подписки для Plus врачей
       const event = new CustomEvent("showPricing");
       window.dispatchEvent(event);
@@ -587,7 +587,7 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
     }
     
     // Get user avatar from session
-    const userAvatar = session?.user?.image || undefined;
+    const userAvatar = user?.avatar || undefined;
     
     const userMessage: Message = {
       content: input || (fileInputRef.current?.files?.length && fileInputRef.current.files.length > 1 ? "Отправлено несколько файлов" : "Отправлен файл"),
@@ -765,7 +765,7 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
         setIsLoading(true);
         
         // Get user avatar from session
-        const userAvatar = session?.user?.image || undefined;
+        const userAvatar = user?.avatar || undefined;
         
         // Создаем временное сообщение пользователя для отображения
         const filesArray = Array.from(event.target.files);
@@ -1006,7 +1006,7 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
         const isDecodeDoctor = doctor.id.toString() === '20';
         
         // Get user avatar from session (если авторизован)
-        const userAvatar = session?.user?.image || undefined;
+        const userAvatar = user?.avatar || undefined;
         
         // Создаем временное сообщение пользователя для отображения
         const userMessage: Message = {
@@ -1259,6 +1259,7 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
 
   return (
     <div className="flex flex-col h-full">
+      {realMessagesExist && doctor ? (
         <> 
           {/* Desktop header - sticky position */}
           <div className="hidden md:block p-4 border-b sticky top-0 bg-white z-10">
@@ -1268,7 +1269,7 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
                   <Avatar className="h-10 w-10 shrink-0 relative bg-blue-100">
                     <AvatarImage 
                       alt={doctor.name} // Доктор точно не null
-                      src={doctor.avatar && doctor.avatar.startsWith('http') ? doctor.avatar : `http://localhost:8000${doctor.avatar}`}
+                      src={doctor.avatar && doctor.avatar.startsWith('http') ? doctor.avatar : `${process.env.NEXT_PUBLIC_API_URL || ''}${doctor.avatar}`}
                       draggable="false"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
@@ -1335,7 +1336,7 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
                   <Avatar className="h-8 w-8 shrink-0 relative bg-blue-100">
                     <AvatarImage 
                       alt={doctor.name} // Доктор точно не null
-                      src={doctor.avatar && doctor.avatar.startsWith('http') ? doctor.avatar : `http://localhost:8000${doctor.avatar}`}
+                      src={doctor.avatar && doctor.avatar.startsWith('http') ? doctor.avatar : `${process.env.NEXT_PUBLIC_API_URL || ''}${doctor.avatar}`}
                       draggable="false"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;

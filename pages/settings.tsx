@@ -3,10 +3,10 @@ import React, { useState, useEffect, useRef, useContext } from 'react';
 import { CheckCircle } from 'lucide-react';
 import { PricingModal } from '../components/pricing/pricing-modal';
 import Image from 'next/image';
-import { useSession, signIn } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { AvatarContext } from './_app';
 import { SubscriptionSection } from '../components/subscription/SubscriptionSection';
+import { useAuth } from '../lib/auth-context';
 import { 
   getUserProfile, 
   updateUserProfile, 
@@ -24,9 +24,10 @@ import {
   getStrapiPlans,
   StrapiPlan
 } from '../lib/api';
+import ProtectedRoute from '../components/auth/ProtectedRoute';
 
 const SettingsPage = () => {
-  const { data: session, status, update: updateSession } = useSession();
+  const { user, token, isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('profile');
   const [plans, setPlans] = useState<PlanResponse[]>([]);
@@ -38,12 +39,7 @@ const SettingsPage = () => {
   const [showPricingModal, setShowPricingModal] = useState(false);
   // selectedPeriod теперь управляется внутри компонента PricingModal
   
-  // Перенаправляем на страницу входа, если пользователь не авторизован
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/login');
-    }
-  }, [status, router]);
+  // Перенаправление на страницу входа теперь обрабатывается ProtectedRoute
 
   const tabs = [
     { id: 'profile', label: 'Личные данные' },
@@ -69,16 +65,16 @@ const SettingsPage = () => {
   
   // Заполняем данные формы из сессии
   useEffect(() => {
-    if (session?.user) {
-      const nameParts = (session.user.name || '').split(' ');
+    if (user) {
+      const nameParts = (user.name || '').split(' ');
       setProfileForm(prev => ({
         ...prev,
         firstName: nameParts[0] || '',
         lastName: nameParts.slice(1).join(' ') || '',
-        email: session.user.email || ''
+        email: user.email || ''
       }));
     }
-  }, [session]);
+  }, [user]);
 
   // Security form state
   const [securityForm, setSecurityForm] = useState({
@@ -87,11 +83,10 @@ const SettingsPage = () => {
     confirmPassword: ''
   });
 
-  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
+  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setProfileForm({
       ...profileForm,
-      [name]: value
+      [e.target.name]: e.target.value
     });
   };
 
@@ -111,15 +106,15 @@ const SettingsPage = () => {
   // Загружаем данные с сервера при загрузке компонента
   useEffect(() => {
     // Добавлено условие, чтобы не выполнять запрос, если пользователь не авторизован
-    if (session?.user?.id && status === 'authenticated') {
+    if (user?.id && isAuthenticated) {
       // Запрашиваем данные с сервера
-      fetchUserProfile(session.user.id);
+      fetchUserProfile(user.id);
       fetchSubscriptionData();
       
-      // Выводим доступные данные из сессии
-      console.log('Session data:', session);
+      // Выводим доступные данные из пользователя
+      console.log('User data:', user);
     }
-  }, [session, status]);
+  }, [user, isAuthenticated]);
   
   // Функция загрузки данных о подписке
   const fetchSubscriptionData = async () => {
@@ -161,7 +156,15 @@ const SettingsPage = () => {
       const nameParts = (userData.name || '').split(' ');
       
       // Проверяем, откуда брать медицинские данные - напрямую из userData или из medical_profile
-      const medical = userData.medical_profile || userData;
+      const medical = userData.medical_profile || { 
+        gender: 'not_specified', 
+        birth_date: null,
+        height: null,
+        weight: null,
+        allergies: null,
+        chronic_diseases: null,
+        medications: null
+      };
       
       setProfileForm({
         firstName: nameParts[0] || '',
@@ -223,7 +226,7 @@ const SettingsPage = () => {
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/upload`, {
           method: 'POST',
           body: formData,
-          headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {},
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         });
         
         if (!response.ok) {
@@ -236,18 +239,18 @@ const SettingsPage = () => {
         // Получаем URL аватарки
         const avatarUrl = uploadData.url;
         
-        if (session?.user) {
+        if (user) {
           // Обновляем данные пользователя с новой аватаркой
           const userData: UserUpdate = {
             avatar: avatarUrl
           };
           
-          await updateUserProfile(Number(session.user.id), userData);
+          await updateUserProfile(Number(user.id), userData);
           
           // Обновляем локальную сессию через механизм next-auth
           await updateSession({
             user: {
-              ...session.user,
+              ...user,
               image: avatarUrl
             }
           });
@@ -283,56 +286,56 @@ const SettingsPage = () => {
     e.preventDefault();
     setUpdateSuccess(false);
     setUpdateError(null);
-    setIsLoading(true);
+    
+    if (!user) {
+      setUpdateError('Необходимо войти в систему');
+      return;
+    }
     
     try {
-      if (!session?.user?.id) {
-        throw new Error('Пользователь не авторизован');
-      }
+      setIsLoading(true);
       
-      // Аватарка уже загружена в handleAvatarChange, если была выбрана
-      // Просто используем ту, что в сессии
-      const avatarUrl = session?.user?.image;
-      
-      // Создаем объект с данными профиля
-      // Преобразуем date string в ISO формат
-      const birthDate = profileForm.birthDate ? 
-        new Date(profileForm.birthDate).toISOString() : null;
-        
+      // Формируем данные для отправки
       const userData: UserUpdate = {
-        name: `${profileForm.firstName} ${profileForm.lastName}`,
-        // Не обновляем аватар тут, он уже обновлен в handleAvatarChange если нужно
+        name: `${profileForm.firstName} ${profileForm.lastName}`.trim(),
         medical_profile: {
-          gender: profileForm.gender || null,
-          birth_date: birthDate,
-          height: profileForm.height ? parseInt(profileForm.height) : null,
-          weight: profileForm.weight ? parseInt(profileForm.weight) : null,
+          gender: profileForm.gender as any,
+          birth_date: profileForm.birthDate || null,
+          height: profileForm.height ? Number(profileForm.height) : null,
+          weight: profileForm.weight ? Number(profileForm.weight) : null,
           allergies: profileForm.allergies || null,
           chronic_diseases: profileForm.chronic_diseases || null,
           medications: profileForm.medications || null
         }
       };
       
-      console.log('Trying to update profile with data:', userData);
+      console.log('Updating profile with data:', userData);
       
-      // Отправляем реальный запрос к API
-      await updateUserProfile(Number(session.user.id), userData);
+      // Отправляем запрос на обновление
+      const updatedUser = await updateUserProfile(Number(user.id), userData);
+      console.log('Updated user data:', updatedUser);
       
+      // Обновляем данные в локальной сессии через localStorage
+      if (userData.name) {
+        const storedUser = localStorage.getItem('user_data');
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser);
+          parsedUser.name = userData.name;
+          localStorage.setItem('user_data', JSON.stringify(parsedUser));
+        }
+      }
+      
+      // Показываем сообщение об успешном обновлении
       setUpdateSuccess(true);
       
-      // Аватарка обновляется отдельно в handleAvatarChange, здесь не нужно обновлять страницу
+      // Скроем сообщение через 3 секунды
+      setTimeout(() => {
+        setUpdateSuccess(false);
+      }, 3000);
       
-      // Задержка перед скрытием сообщения об успехе
-      setTimeout(() => setUpdateSuccess(false), 3000);
     } catch (error: any) {
-      console.error('Ошибка при обновлении профиля:', error);
-      
-      // Делаем сообщение более подробным для отладки
-      const errorMsg = error.message || 'Произошла ошибка при обновлении профиля';
-      setUpdateError(errorMsg);
-      
-      // Выводим сообщение об ошибке без неопределенных данных
-      console.error('Произошла ошибка при отправке данных');
+      console.error('Error updating profile:', error);
+      setUpdateError(error.message || 'Ошибка при обновлении профиля');
     } finally {
       setIsLoading(false);
     }
@@ -345,53 +348,59 @@ const SettingsPage = () => {
 
   const handleSecuritySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setUpdateSuccess(false);
+    setUpdateError(null);
     
-    // Reset states
-    setSecuritySuccess(false);
-    setSecurityError(null);
-    
-    // Validate password match
-    if (securityForm.newPassword !== securityForm.confirmPassword) {
-      setSecurityError('Новый пароль и подтверждение не совпадают');
+    // Проверяем наличие пользователя
+    if (!user) {
+      setUpdateError('Необходимо войти в систему');
       return;
     }
     
-    // Validate password length
+    // Проверяем совпадение паролей
+    if (securityForm.newPassword !== securityForm.confirmPassword) {
+      setUpdateError('Новый пароль и подтверждение не совпадают');
+      return;
+    }
+    
+    // Проверяем валидность нового пароля (например, минимум 8 символов)
     if (securityForm.newPassword.length < 8) {
-      setSecurityError('Новый пароль должен содержать минимум 8 символов');
+      setUpdateError('Новый пароль должен содержать не менее 8 символов');
       return;
     }
     
     try {
-      setSecurityLoading(true);
+      setIsLoading(true);
       
-      // Prepare data for API
+      // Формируем данные для отправки
       const passwordData: PasswordChangeData = {
         current_password: securityForm.currentPassword,
         new_password: securityForm.newPassword
       };
       
-      // Call the API to change password
-      const result = await changePassword(passwordData);
+      // Отправляем запрос на смену пароля
+      await changePassword(passwordData);
       
-      // Show success message
-      setSecuritySuccess(true);
-      
-      // Reset form
+      // Сбрасываем форму
       setSecurityForm({
         currentPassword: '',
         newPassword: '',
         confirmPassword: ''
       });
       
-      // Hide success message after 3 seconds
-      setTimeout(() => setSecuritySuccess(false), 3000);
+      // Показываем сообщение об успешном обновлении
+      setUpdateSuccess(true);
+      
+      // Скроем сообщение через 3 секунды
+      setTimeout(() => {
+        setUpdateSuccess(false);
+      }, 3000);
       
     } catch (error: any) {
-      console.error('Ошибка при смене пароля:', error);
-      setSecurityError(error.message || 'Произошла ошибка при смене пароля');
+      console.error('Error changing password:', error);
+      setUpdateError(error.message || 'Ошибка при смене пароля');
     } finally {
-      setSecurityLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -484,17 +493,17 @@ const SettingsPage = () => {
               <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 min-w-[64px] min-h-[64px] rounded-full overflow-hidden relative group cursor-pointer" onClick={handleAvatarClick} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {session?.user?.image || avatarFile ? (
+                    {user?.image || avatarFile ? (
                       <>
                         <Image 
                           src={avatarFile 
                             ? URL.createObjectURL(avatarFile) 
-                            : (session?.user?.image 
-                                ? (session.user.image.startsWith('http') 
-                                    ? session.user.image 
-                                    : getBackendUrl(session.user.image))
+                            : (user?.image 
+                                ? (user.image.startsWith('http') 
+                                    ? user.image 
+                                    : getBackendUrl(user.image))
                                 : '')} 
-                          alt={session?.user?.name || 'Пользователь'} 
+                          alt={user?.name || 'Пользователь'} 
                           className="object-cover w-full h-full rounded-full" 
                           width={64} 
                           height={64} 
@@ -509,7 +518,7 @@ const SettingsPage = () => {
                       </>
                     ) : (
                       <div className="w-full h-full bg-blue-100 flex items-center justify-center text-blue-500 text-2xl group-hover:opacity-80 transition-opacity rounded-full">
-                        {session?.user?.name?.[0].toUpperCase() || 'У'}
+                        {user?.name?.[0].toUpperCase() || 'У'}
                         <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
                           <span className="text-white text-xs">Изменить</span>
                         </div>
@@ -517,8 +526,8 @@ const SettingsPage = () => {
                     )}
                   </div>
                   <div>
-                    <h2 className="font-medium">{session?.user?.name || 'Пользователь'}</h2>
-                    <p className="text-sm text-gray-500 text-left">{session?.user?.email}</p>
+                    <h2 className="font-medium">{user?.name || 'Пользователь'}</h2>
+                    <p className="text-sm text-gray-500 text-left">{user?.email}</p>
                   </div>
                   <input 
                     ref={fileInputRef} 
@@ -904,4 +913,11 @@ const SettingsPage = () => {
   );
 };
 
-export default SettingsPage;
+// Обновляем экспорт компонента, обернув его в ProtectedRoute
+export default function ProtectedSettingsPage() {
+  return (
+    <ProtectedRoute>
+      <SettingsPage />
+    </ProtectedRoute>
+  );
+};

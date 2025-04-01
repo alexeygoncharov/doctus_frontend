@@ -1,6 +1,5 @@
 import { Message } from "./types";
 import { Doctor } from "./doctors";
-import { getSession } from "next-auth/react";
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
@@ -19,6 +18,7 @@ export interface UserProfile {
   id: number;
   name: string;
   email: string;
+  phone?: string;
   avatar?: string;
   role: string;
   created_at: string;
@@ -33,20 +33,19 @@ export interface UserUpdate {
   medical_profile?: MedicalProfile;
 }
 
-// API URL
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const SERVER_URL = API_URL; // For direct server assets like images
+// API URLs
+const API_URL = 'https://backend.doctus.chat';
+
+// Use direct backend URL for browser requests
+// WARNING: Requires backend CORS configuration
+const BROWSER_API_URL = API_URL; // <- Always use direct URL
+
+// For direct server assets like images
+const SERVER_URL = API_URL;
 
 // Helper to get full URL for backend resources
 export const getBackendUrl = (path: string) => {
   if (path?.startsWith('http')) return path;
-  
-  // Special handling for uploaded files - use our NextJS API proxy
-  if (path?.startsWith('/uploads/')) {
-    // Route through our NextJS API proxy instead of direct backend URL
-    // This ensures files are properly fetched from the same origin
-    return `/api${path}`;
-  }
   
   // For other API requests, use the backend URL directly
   if (path?.startsWith('/')) {
@@ -97,26 +96,39 @@ export class ApiClient {
   }
 
   static async request(url: string, options: RequestInit = {}) {
-    // Получаем сессию для авторизации
-    const session = await getSession();
-    
-    // Добавляем заголовок авторизации, если есть токен
-    const headers = {
-      ...options.headers,
-      ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
+    // Формируем заголовки для запроса
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
     };
+    
+    // Получаем токен из localStorage
+    if (typeof window !== 'undefined') {
+      const storedToken = localStorage.getItem('auth_token');
+      if (storedToken) {
+        headers['Authorization'] = `Bearer ${storedToken}`;
+      }
+    }
 
     // Если это FormData, не устанавливаем content-type, чтобы браузер сам добавил boundary
     if (options.body instanceof FormData) {
       delete headers['Content-Type'];
     }
 
+    // Проверяем, не является ли URL полным путем
+    const isFullUrl = url.startsWith('http://') || url.startsWith('https://');
+    
+    // Используем прямой URL к бэкенду для клиентских запросов
+    // или прямой URL если он полный
+    const apiUrlToUse = isFullUrl ? url : `${BROWSER_API_URL}${url}`;
+    
     try {
-      // Выполняем запрос с настройками CORS
-      const response = await fetch(`${API_URL}${url}`, {
+      console.log(`Making API request to: ${apiUrlToUse}`);
+      
+      // Выполняем запрос напрямую к API
+      const response = await fetch(apiUrlToUse, {
         ...options,
         headers,
-        mode: 'cors',  // Явно указываем режим CORS
+        mode: 'cors', // Явно указываем режим CORS для прямых запросов к бэкенду
       });
 
       // Обрабатываем ошибки
@@ -130,7 +142,7 @@ export class ApiClient {
         if (error.detail) {
           if (Array.isArray(error.detail)) {
             // Если ошибка - массив сообщений, объединяем их
-            errorMessage = error.detail.map(err => {
+            errorMessage = error.detail.map((err: unknown) => {
               if (typeof err === 'object') {
                 return JSON.stringify(err);
               }
@@ -176,6 +188,7 @@ export async function uploadFile(file: File, folder: string = ''): Promise<{url:
   if (folder) {
     formData.append('folder', folder);
   }
+  // Используем относительный путь, ApiClient добавит API_URL
   return ApiClient.request('/api/upload', {
     method: 'POST',
     body: formData
@@ -248,7 +261,14 @@ export interface SubscriptionCreate {
 
 // Subscription functions
 export async function getPlans(): Promise<PlanResponse[]> {
-  return ApiClient.get('/plans');
+  try {
+    // Используем прямой URL к бэкенду через ApiClient
+    console.log(`Fetching plans from: ${API_URL}/public/plans`);
+    return await ApiClient.get('/public/plans');
+  } catch (error) {
+    console.error('Error fetching plans:', error);
+    throw error;
+  }
 }
 
 // Get plans from our backend API
@@ -372,9 +392,6 @@ export async function sendMessage(doctorId: string | number, message: string, fi
       // Иначе используем прямой эндпоинт к доктору
       streamUrl = `${API_URL}/chats/doctor/${doctorId}/messages/stream`;
     }
-
-    // Получаем сессию для авторизации
-    const session = await getSession();
     
     // Создаем ID для нового сообщения (для фронтенда)
     const messageId = crypto.randomUUID();
@@ -388,9 +405,12 @@ export async function sendMessage(doctorId: string | number, message: string, fi
       'Content-Type': 'application/json'
     };
     
+    // Получаем токен авторизации из localStorage
+    const storedToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    
     // Добавляем токен авторизации, если он есть
-    if (session?.access_token) {
-      headers['Authorization'] = `Bearer ${session.access_token}`;
+    if (storedToken) {
+      headers['Authorization'] = `Bearer ${storedToken}`;
     } else if (!isDecodeDoctor) {
       // Для всех докторов кроме "Расшифровка" требуется авторизация
       throw new Error("Требуется авторизация для отправки сообщений");
@@ -497,30 +517,27 @@ export async function sendMessage(doctorId: string | number, message: string, fi
 // Функция для получения списка докторов из API
 export async function getDoctors() {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/public/doctors`);
+    // Используем прямой URL к бэкенду через ApiClient
+    console.log(`Fetching doctors from: ${API_URL}/public/doctors`);
+    const data = await ApiClient.get('/public/doctors');
     
-    if (!response.ok) {
-      throw new Error(`Error fetching doctors: ${response.status}`);
-    }
-    
-    const data = await response.json();
+    console.log('Doctors data received:', data);
     return data;
   } catch (error) {
     console.error('Error fetching doctors:', error);
-    throw error;
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      console.error('Network error - check if the backend server is running and accessible');
+    }
+    // Возвращаем пустой массив в случае ошибки, чтобы избежать краша UI
+    return [];
   }
 }
 
 export async function getDoctorBySlug(slug: string) {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/doctors/public/by-slug/${slug}`);
-    
-    if (!response.ok) {
-      throw new Error(`Error fetching doctor: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    return data;
+    // Используем прямой URL к бэкенду через ApiClient
+    console.log(`Fetching doctor by slug from: ${API_URL}/doctors/public/by-slug/${slug}`);
+    return await ApiClient.get(`/doctors/public/by-slug/${slug}`);
   } catch (error) {
     console.error('Error fetching doctor by slug:', error);
     throw error;
@@ -530,10 +547,10 @@ export async function getDoctorBySlug(slug: string) {
 // Загрузка чатов пользователя
 export async function getUserChats() {
   try {
-    // Проверяем наличие сессии перед запросом
-    const session = await getSession();
-    if (!session || !session.access_token) {
-      console.warn('Session not found, unable to fetch chats');
+    // Проверяем наличие токена перед запросом
+    const storedToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    if (!storedToken) {
+      console.warn('Auth token not found, unable to fetch chats');
       return [];
     }
     
@@ -548,10 +565,10 @@ export async function getUserChats() {
 // Загрузка сообщений для конкретного чата
 export async function getChatMessages(chatId: number, skip: number = 0, limit: number = 100) {
   try {
-    // Проверяем наличие сессии перед запросом
-    const session = await getSession();
-    if (!session || !session.access_token) {
-      console.warn('Session not found, unable to fetch chat messages');
+    // Проверяем наличие токена перед запросом
+    const storedToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    if (!storedToken) {
+      console.warn('Auth token not found, unable to fetch chat messages');
       return [];
     }
     
@@ -571,8 +588,8 @@ export async function createChat(doctorId: number) {
     // Специальное исключение для доктора "Расшифровка" (ID 20)
     const isDecodeDoctor = doctorId === 20;
     
-    // Получаем сессию для авторизации
-    const session = await getSession();
+    // Получаем токен авторизации из localStorage
+    const storedToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
     
     // Для неавторизованной работы с доктором Расшифровка
     const headers: Record<string, string> = {
@@ -580,8 +597,8 @@ export async function createChat(doctorId: number) {
     };
     
     // Добавляем токен авторизации, если он есть
-    if (session?.access_token) {
-      headers['Authorization'] = `Bearer ${session.access_token}`;
+    if (storedToken) {
+      headers['Authorization'] = `Bearer ${storedToken}`;
     } else if (!isDecodeDoctor) {
       // Для всех докторов кроме "Расшифровка" требуется авторизация
       throw new Error("Требуется авторизация для создания чата");
@@ -631,18 +648,18 @@ export async function uploadChatFiles(chatId: number, files: File[], fileType: '
     
     // Add a timestamp to prevent caching
     formData.append('_t', Date.now().toString());
-
-    // Получаем сессию для авторизации
-    const session = await getSession();
     
     // Для неавторизованной работы с файлами
     const headers: Record<string, string> = {
       // Не добавляем Content-Type, чтобы браузер сам сформировал с boundary
     };
     
+    // Получаем токен авторизации из localStorage
+    const storedToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    
     // Добавляем токен авторизации, если он есть
-    if (session?.access_token) {
-      headers['Authorization'] = `Bearer ${session.access_token}`;
+    if (storedToken) {
+      headers['Authorization'] = `Bearer ${storedToken}`;
     }
     
     // Прямой запрос без использования ApiClient для обхода проверки авторизации
@@ -680,18 +697,18 @@ export async function analyzeFile(file: File) {
       fileExtension: file.name.split('.').pop()?.toLowerCase(),
       fileSize: file.size
     });
-
-    // Получаем сессию для авторизации
-    const session = await getSession();
     
     // Для неавторизованной работы с файлами
     const headers: Record<string, string> = {
       // Не добавляем Content-Type, чтобы браузер сам сформировал с boundary
     };
     
+    // Получаем токен авторизации из localStorage
+    const storedToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    
     // Добавляем токен авторизации, если он есть
-    if (session?.access_token) {
-      headers['Authorization'] = `Bearer ${session.access_token}`;
+    if (storedToken) {
+      headers['Authorization'] = `Bearer ${storedToken}`;
     }
     
     // Прямой запрос без использования ApiClient для обхода проверки авторизации
@@ -732,9 +749,6 @@ export async function analyzeMultipleFiles(files: File[]) {
       fileExtensions: files.map(f => f.name.split('.').pop()?.toLowerCase()),
       fileSizes: files.map(f => f.size)
     });
-
-    // Получаем сессию для авторизации
-    const session = await getSession();
     
     // Специальное исключение для доктора "Расшифровка" (ID 20)
     // Для неавторизованной работы с файлами
@@ -742,9 +756,12 @@ export async function analyzeMultipleFiles(files: File[]) {
       // Не добавляем Content-Type, чтобы браузер сам сформировал с boundary
     };
     
+    // Получаем токен авторизации из localStorage
+    const storedToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    
     // Добавляем токен авторизации, если он есть
-    if (session?.access_token) {
-      headers['Authorization'] = `Bearer ${session.access_token}`;
+    if (storedToken) {
+      headers['Authorization'] = `Bearer ${storedToken}`;
     }
     
     // Прямой запрос без использования ApiClient для обхода проверки авторизации

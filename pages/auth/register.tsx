@@ -2,9 +2,9 @@ import Head from 'next/head';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
-import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import SocialAuthButtons from '../../components/ui/social-auth-buttons';
+import { useAuth } from '../../lib/auth-context';
 
 const RegisterPage = () => {
   const [formData, setFormData] = useState({
@@ -18,6 +18,7 @@ const RegisterPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { register } = useAuth();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -45,46 +46,13 @@ const RegisterPage = () => {
     setLoading(true);
     
     try {
-      // Формируем данные для регистрации
-      const userData = {
-        email: formData.email,
-        password: formData.password,
-        name: `${formData.firstName} ${formData.lastName}`,
-        medical_profile: {
-          gender: "not_specified",
-          height: 0,
-          weight: 0
-        }
-      };
+      // Формируем полное имя
+      const fullName = `${formData.firstName} ${formData.lastName}`;
       
-      // Отправляем запрос на регистрацию
-      const response = await fetch('http://localhost:8000/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
-      });
+      // Используем функцию register из AuthContext
+      await register(formData.email, fullName, formData.password);
       
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.detail || 'Ошибка при регистрации');
-      }
-      
-      // После успешной регистрации выполняем вход
-      const result = await signIn('credentials', {
-        redirect: false,
-        email: formData.email,
-        password: formData.password,
-      });
-      
-      if (result?.error) {
-        throw new Error(result.error);
-      }
-      
-      // Перенаправляем на главную страницу
-      router.push('/');
+      // Перенаправление происходит внутри register
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Произошла ошибка при регистрации');
     } finally {

@@ -152,8 +152,8 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>Онлайн консультация ИИ гастроэнтеролога</title>
-        <meta name="description" content="Онлайн консультация ИИ гастроэнтеролога - задайте вопрос, загрузите анализы и фото, получите рекомендации" />
+        <title>Онлайн консультация ИИ доктора</title>
+        <meta name="description" content="Онлайн консультация ИИ доктора - задайте вопрос, загрузите анализы и фото, получите рекомендации" />
       </Head>
 
       <section className="px-0 md:px-2">
@@ -163,7 +163,7 @@ export default function Home() {
               <Image src="/img/icons/stars.svg" alt="Start" width={24} height={24} />
               <span className="text-xs md:text-sm">Интеллектуальный анализ медицинских показателей с поддержкой ИИ</span>
             </div>
-            <h1 className="text-center text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold max-w-227.5">Онлайн консультация <br /> ИИ гастроэнтеролога</h1>
+            <h1 className="text-center text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold max-w-227.5">Онлайн консультация <br /> ИИ доктора</h1>
             <p className="text-center max-w-227.5 text-sm sm:text-base md:text-lg lg:text-[21px] lg:-md-4 lg:-mt-5">Задайте вопрос ИИ доктору, загрузите ваши анализы, фото и получите подробную расшифровку с рекомендациями от искусственного интеллекта</p>
             <div className="flex items-center max-w-105.5 py-1 pl-1 pr-5 sm:pr-7 bg-[#DFEBFB] rounded-[72px] gap-3.5 sm:gap-5">
               <div className="flex items-center rounded-[72px] bg-white px-4.5 py-1 sm:py-1.5 gap-2.5">

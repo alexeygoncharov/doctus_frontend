@@ -74,9 +74,10 @@ export function getImageUrl(post: BlogPost): string {
     return '/images/post-placeholder.jpg'; // Default fallback image
   }
   
-  // Handle backend URLs using our proxy to prevent 404s
-  if (post.image_url.startsWith('/uploads/')) {
-    return `/api${post.image_url}`;
+  // Handle backend URLs using environment variable or default
+  if (post.image_url && post.image_url.startsWith('/uploads/')) {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend.doctus.chat';
+    return `${backendUrl}${post.image_url}`;
   }
   
   return post.image_url;

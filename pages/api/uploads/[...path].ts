@@ -1,5 +1,4 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
 // Using built-in fetch, no need to import node-fetch
 
 export default async function handler(
@@ -21,15 +20,10 @@ export default async function handler(
   const fullUrl = `${apiUrl}/uploads/${filePath}`;
   
   try {
-    // Forward the request to the backend
-    const session = await getSession({ req });
-    const headers: Record<string, string> = {};
+    // Для проксирования файлов изображений в блоге авторизация не требуется
+    // Большинство изображений будут публично доступны, поэтому отправляем запрос без токена
     
-    if (session?.access_token) {
-      headers['Authorization'] = `Bearer ${session.access_token}`;
-    }
-    
-    const response = await fetch(fullUrl, { headers });
+    const response = await fetch(fullUrl);
     
     if (!response.ok) {
       console.error(`Error fetching file: ${response.status} ${response.statusText}`);

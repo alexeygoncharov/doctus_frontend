@@ -105,7 +105,7 @@ export function ImageMessage({ images, processingStatus }: ImageMessageProps) {
               alt={images[0].name} 
               className="w-full h-auto rounded-lg object-cover" 
               src={images[0].cached_data || images[0].url}
-              ref={el => imageRefs.current[0] = el}
+              ref={(el) => { imageRefs.current[0] = el; }}
               onLoad={handleImageLoad}
               // Simple error handling with fallback image and caching
               onError={(e) => {
@@ -169,7 +169,7 @@ export function ImageMessage({ images, processingStatus }: ImageMessageProps) {
                   alt={image.name} 
                   className="w-full h-full rounded-lg object-cover" 
                   src={image.cached_data || image.url}
-                  ref={el => imageRefs.current[index] = el}
+                  ref={(el) => { imageRefs.current[index] = el; }}
                   onLoad={handleImageLoad}
                   onError={(e) => {
                     console.error("Failed to load image:", image.url);
