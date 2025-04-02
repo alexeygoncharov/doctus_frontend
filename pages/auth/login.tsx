@@ -16,7 +16,8 @@ const LoginPage = () => {
   const { returnUrl, callbackUrl } = router.query;
 
   // Если пользователь уже авторизован, перенаправляем его
-  if (status === 'authenticated') {
+  if (status === 'authenticated' && session?.user?.id) {
+    console.log('Login page: User is authenticated, redirecting to', callbackUrl || returnUrl || '/');
     const redirectUrl = (callbackUrl || returnUrl || '/') as string;
     router.push(redirectUrl);
     return null;
@@ -28,19 +29,52 @@ const LoginPage = () => {
     setIsLoading(true);
 
     try {
+      console.log('Attempting login with credentials', { email });
+      
+      // Получаем URL для перенаправления после успешного входа
+      const redirectTo = (callbackUrl || returnUrl || '/') as string;
+      console.log('Redirect URL after login:', redirectTo);
+      
       const result = await signIn('credentials', {
         redirect: false,
         email,
         password,
-        callbackUrl: (callbackUrl || returnUrl || '/') as string
+        callbackUrl: redirectTo
+      });
+
+      console.log('SignIn result:', { 
+        ok: result?.ok, 
+        error: result?.error,
+        url: result?.url,
+        status: result?.status
       });
 
       if (result?.error) {
-        setErrorMsg('Неверный email или пароль');
+        // Map specific error messages if needed
+        let displayError = 'Неверный email или пароль';
+        
+        if (result.error === 'RefreshAccessTokenError') {
+          displayError = 'Сессия устарела. Пожалуйста, войдите снова.';
+        }
+        
+        setErrorMsg(displayError);
         console.error('Ошибка входа:', result.error);
-      } else if (result?.url) {
-        // Успешная авторизация, перенаправляем пользователя
-        router.push(result.url);
+      } else if (result?.ok) {
+        // Успешная авторизация, ждем короткую задержку для гарантии инициализации сессии
+        console.log('Login successful, redirecting after delay for session init');
+        
+        // Используем url из результата, если он есть, иначе fallback
+        const redirectTarget = result?.url || redirectTo || '/';
+        console.log('Will redirect to:', redirectTarget);
+        
+        // Небольшая задержка, чтобы дать NextAuth время обновить сессию
+        setTimeout(() => {
+          router.push(redirectTarget);
+        }, 500);
+      } else {
+        // Непредвиденная ситуация - есть результат, но нет ни ошибки, ни признака успеха
+        console.warn('Unexpected result from signIn:', result);
+        setErrorMsg('Произошла непредвиденная ошибка при входе');
       }
     } catch (error) {
       console.error('Ошибка авторизации:', error);

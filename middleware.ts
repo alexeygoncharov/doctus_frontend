@@ -33,8 +33,21 @@ export async function middleware(request: NextRequest) {
 
   // Redirect authenticated users trying to access login/register pages
   if (isAuthPath && isAuthenticated) {
-    console.log(`Middleware: Authenticated access to ${pathname}, redirecting to home.`);
-    return NextResponse.redirect(new URL('/', origin)); // Redirect to home page
+    // Извлекаем callbackUrl из запроса, если он есть
+    const callbackUrl = request.nextUrl.searchParams.get('callbackUrl');
+    
+    console.log(`Middleware: Authenticated access to ${pathname}, callbackUrl=${callbackUrl}`);
+    
+    // Если есть callbackUrl и он начинается с /, перенаправляем на него
+    // (только внутренние URL-ы начинающиеся с / для безопасности)
+    if (callbackUrl && callbackUrl.startsWith('/')) {
+      console.log(`Middleware: Redirecting to callbackUrl: ${callbackUrl}`);
+      return NextResponse.redirect(new URL(callbackUrl, origin));
+    }
+    
+    // Иначе перенаправляем на домашнюю страницу
+    console.log(`Middleware: Redirecting to home page`);
+    return NextResponse.redirect(new URL('/', origin));
   }
 
   // Allow the request to proceed if none of the above conditions are met
