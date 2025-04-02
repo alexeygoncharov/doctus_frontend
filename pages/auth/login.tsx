@@ -1,10 +1,9 @@
 import Head from 'next/head';
-import Image from 'next/image';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/router';
+import { signIn, useSession } from 'next-auth/react';
 import SocialAuthButtons from '../../components/ui/social-auth-buttons';
-import { useAuth } from '../../lib/auth-context';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -13,19 +12,15 @@ const LoginPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const router = useRouter();
-  const { login, isAuthenticated } = useAuth();
-  const { returnUrl } = router.query;
+  const { data: session, status } = useSession();
+  const { returnUrl, callbackUrl } = router.query;
 
   // Если пользователь уже авторизован, перенаправляем его
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.push(
-        typeof returnUrl === 'string' && returnUrl 
-          ? decodeURIComponent(returnUrl) 
-          : '/'
-      );
-    }
-  }, [isAuthenticated, router, returnUrl]);
+  if (status === 'authenticated') {
+    const redirectUrl = (callbackUrl || returnUrl || '/') as string;
+    router.push(redirectUrl);
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,14 +28,23 @@ const LoginPage = () => {
     setIsLoading(true);
 
     try {
-      console.log('Attempting to log in with email:', email);
-      await login(email, password);
-      console.log('Login successful');
-      
-      // Перенаправление произойдет в useEffect выше
+      const result = await signIn('credentials', {
+        redirect: false,
+        email,
+        password,
+        callbackUrl: (callbackUrl || returnUrl || '/') as string
+      });
+
+      if (result?.error) {
+        setErrorMsg('Неверный email или пароль');
+        console.error('Ошибка входа:', result.error);
+      } else if (result?.url) {
+        // Успешная авторизация, перенаправляем пользователя
+        router.push(result.url);
+      }
     } catch (error) {
-      console.error('Login error:', error);
-      setErrorMsg(error instanceof Error ? error.message : 'Произошла ошибка при входе');
+      console.error('Ошибка авторизации:', error);
+      setErrorMsg('Произошла ошибка при входе в систему');
     } finally {
       setIsLoading(false);
     }
@@ -131,7 +135,7 @@ const LoginPage = () => {
             </form>
             
             <div className="mt-6">
-              <SocialAuthButtons callbackUrl="/" />
+              <SocialAuthButtons callbackUrl={(callbackUrl || returnUrl || '/') as string} />
             </div>
 
             <div className="mt-6 text-center">

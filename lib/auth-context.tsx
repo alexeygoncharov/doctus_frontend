@@ -1,157 +1,61 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
-import { UserProfile } from './api';
+import React, { createContext, useContext, ReactNode, useState } from 'react';
+import { SessionProvider, useSession, signIn, signOut } from 'next-auth/react';
+import { UserProfile } from './api'; // Assuming this defines the user structure you need
 
-// Helper function to set a cookie
-const setCookie = (name: string, value: string, days: number) => {
-  let expires = "";
-  if (days) {
-    const date = new Date();
-    date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-    expires = "; expires=" + date.toUTCString();
+// Расширяем существующие типы из next-auth, добавляя только нужные поля
+declare module 'next-auth' {
+  interface Session {
+    accessToken?: string;
+    error?: string;
   }
-  const secureFlag = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : '';
-  const cookieString = name + "=" + (value || "") + expires + "; path=/; SameSite=Lax" + secureFlag;
-  document.cookie = cookieString;
-};
-
-// Helper function to get a cookie
-const getCookie = (name: string): string | null => {
-  if (typeof document === 'undefined') return null; // Guard against SSR
-  const nameEQ = name + "=";
-  const ca = document.cookie.split(';');
-  for (let i = 0; i < ca.length; i++) {
-    let c = ca[i];
-    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-    if (c.indexOf(nameEQ) === 0) {
-        const value = c.substring(nameEQ.length, c.length);
-        return value;
-    }
-  }
-  return null;
-};
-
-// Helper function to erase a cookie
-const eraseCookie = (name: string) => {
-  if (typeof document === 'undefined') return; // Guard against SSR
-  const secureFlag = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Lax' + secureFlag;
-};
-
-interface AuthContextType {
-  user: UserProfile | null;
-  token: string | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-  register: (email: string, name: string, password: string) => Promise<void>;
 }
 
-// Значения по умолчанию для контекста
-const defaultContext: AuthContextType = {
-  user: null,
-  token: null,
-  isLoading: true,
+interface AppAuthContextType {
+  user: (UserProfile & { id: string }) | null | undefined; // User profile or null/undefined during loading
+  token: string | null | undefined; // Access token or null/undefined
+  isLoading: boolean; // Loading state from useSession
+  isAuthenticated: boolean; // Based on session status
+  login: (email: string, password: string) => Promise<void>; // Using signIn from next-auth
+  logout: () => void; // Using signOut from next-auth
+  register: (email: string, name: string, password: string) => Promise<void>; // Keep your custom register logic
+}
+
+// Default context value matching the type
+const defaultContext: AppAuthContextType = {
+  user: undefined, // Start as undefined
+  token: undefined,
+  isLoading: true, // Initially loading
   isAuthenticated: false,
-  login: async () => {},
-  logout: () => {},
-  register: async () => {},
+  login: async () => { throw new Error('Login function not implemented'); },
+  logout: () => { throw new Error('Logout function not implemented'); },
+  register: async () => { throw new Error('Register function not implemented'); },
 };
 
-// Создаем контекст
-const AuthContext = createContext<AuthContextType>(defaultContext);
+const AppAuthContext = createContext<AppAuthContextType>(defaultContext);
 
-// Hook для использования контекста авторизации
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => useContext(AppAuthContext);
 
-// Провайдер контекста
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
+// Internal provider component that uses useSession hook
+const AuthProviderInternal: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { data: session, status } = useSession();
+  const isLoading = status === 'loading';
+  const isAuthenticated = status === 'authenticated';
+  const [isRegistering, setIsRegistering] = useState(false);
 
-  // Функция для входа пользователя
-  const login = async (email: string, password: string) => {
-    try {
-      setIsLoading(true);
-      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const formData = new URLSearchParams();
-      formData.append('username', email);
-      formData.append('password', password);
-
-      const tokenResponse = await fetch(`${backendUrl}/auth/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: formData,
-        mode: 'cors',
-      });
-
-      if (!tokenResponse.ok) {
-        const errorText = await tokenResponse.text();
-        console.error(`[Auth Login] Token request failed: ${tokenResponse.status}, ${errorText}`);
-        throw new Error('Неверный email или пароль');
-      }
-
-      const tokenData = await tokenResponse.json();
-      const accessToken = tokenData.access_token;
-
-      // Сохраняем токен в localStorage и cookie (на 1 день)
-      localStorage.setItem('auth_token', accessToken);
-      setCookie('auth_token', accessToken, 1); // Устанавливаем куку!
-      setToken(accessToken);
-
-      // Получаем данные пользователя
-      const userResponse = await fetch(`${backendUrl}/auth/me`, {
-        headers: { 'Authorization': `Bearer ${accessToken}` },
-        mode: 'cors',
-      });
-
-      if (!userResponse.ok) {
-        eraseCookie('auth_token');
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user_data');
-        setToken(null);
-        setUser(null);
-        const errorText = await userResponse.text();
-        console.error(`[Auth Login] /auth/me request failed: ${userResponse.status}, ${errorText}`);
-        throw new Error('Не удалось получить данные пользователя');
-      }
-
-      const userData = await userResponse.json();
-      localStorage.setItem('user_data', JSON.stringify(userData));
-      setUser(userData);
-
-      // Перенаправляем на главную страницу или на returnUrl, если он есть
-      const returnUrl = router.query.returnUrl || '/';
-      const redirectTarget = typeof returnUrl === 'string' ? returnUrl : '/';
-      router.push(redirectTarget);
-
-    } catch (error) {
-      console.error('[Auth Login] Login failed:', error);
-      eraseCookie('auth_token');
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user_data');
-      setToken(null);
-      setUser(null);
-      throw error; // Пробрасываем ошибку для обработки на странице входа
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Функция для регистрации пользователя
+  // Custom registration function (assuming it hits your backend directly)
   const register = async (email: string, name: string, password: string) => {
+    // Replace with your actual registration API call logic
     try {
-      setIsLoading(true);
+      setIsRegistering(true); // Используем отдельное состояние для регистрации
       const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const registerResponse = await fetch(`${backendUrl}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email, name, password,
-          medical_profile: { gender: "not_specified", height: 0, weight: 0 }
+          email,
+          name, // Ensure your backend expects 'name' and not 'full_name' here
+          password,
+          medical_profile: { gender: "not_specified", height: 0, weight: 0 } // Or handle this separately
         }),
         mode: 'cors',
       });
@@ -159,113 +63,83 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!registerResponse.ok) {
         const errorText = await registerResponse.text();
         console.error(`[Auth Register] Register request failed: ${registerResponse.status}, ${errorText}`);
-        throw new Error('Ошибка при регистрации');
+        // Try to parse backend error detail
+        let detail = 'Ошибка при регистрации';
+        try {
+          const errorJson = JSON.parse(errorText);
+          detail = errorJson.detail || detail;
+        } catch (e) { /* ignore json parse error */ }
+        throw new Error(detail);
       }
 
+      // After successful registration, automatically log the user in
       await login(email, password);
 
     } catch (error) {
       console.error('[Auth Register] Registration failed:', error);
-      throw error;
+      throw error; // Re-throw the error for the UI to handle
     } finally {
-      setIsLoading(false);
+      setIsRegistering(false); // Выключаем состояние загрузки
     }
   };
 
-  // Функция для выхода пользователя
-  const logout = () => {
-    eraseCookie('auth_token'); // Удаляем cookie
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user_data');
-    setUser(null);
-    setToken(null);
-    router.push('/auth/login');
+  // Login function using next-auth signIn
+  const login = async (email: string, password: string) => {
+    const result = await signIn('credentials', {
+      redirect: false, // Prevent NextAuth from redirecting automatically
+      email,
+      password,
+    });
+
+    if (result?.error) {
+      console.error('[Auth Login] NextAuth signIn failed:', result.error);
+       // Map common NextAuth errors or use the error directly
+       let errorMessage = 'Неверный email или пароль'; // Default message
+       if (result.error === 'CredentialsSignin') {
+           // This is the typical error for bad credentials passed from authorize
+           // You might have thrown a custom error message from authorize
+           // However, NextAuth often masks the specific message here.
+           // Consider checking session?.error after the hook updates if needed.
+           errorMessage = 'Учетные данные неверны. Пожалуйста, проверьте email и пароль.';
+       } else {
+           // Handle other potential errors (network, configuration, etc.)
+           errorMessage = `Ошибка входа: ${result.error}`;
+       }
+      throw new Error(errorMessage);
+    }
+
+    // No need to manually set user/token here, useSession handles it
+    // No need to manually redirect, handle redirects in the page using router based on status
+    console.log('[Auth Login] NextAuth signIn successful');
   };
 
-  // При инициализации проверяем сохраненные данные
-  useEffect(() => {
-    const initAuth = async () => {
-      let activeToken: string | null = null;
-      let userDataFromStorage: UserProfile | null = null;
+  // Logout function using next-auth signOut
+  const logout = () => {
+    signOut({ callbackUrl: '/auth/login' }); // Redirect to login after sign out
+    // No need to manually clear state, SessionProvider handles it
+  };
 
-      try {
-        const cookieToken = getCookie('auth_token');
-        const storedToken = localStorage.getItem('auth_token');
-        const storedUserDataRaw = localStorage.getItem('user_data');
-
-        if (cookieToken) {
-            activeToken = cookieToken;
-            if (storedToken !== cookieToken) {
-                localStorage.setItem('auth_token', cookieToken);
-            }
-        } else if (storedToken) {
-            activeToken = storedToken;
-            setCookie('auth_token', storedToken, 1);
-        }
-
-        if (storedUserDataRaw) {
-            try {
-                userDataFromStorage = JSON.parse(storedUserDataRaw);
-            } catch (e) {
-                console.error('[Auth Init] Error parsing stored user data:', e);
-                localStorage.removeItem('user_data');
-            }
-        }
-
-        if (activeToken) {
-            setToken(activeToken);
-            if (userDataFromStorage) {
-                setUser(userDataFromStorage);
-            }
-
-            try {
-                const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-                const response = await fetch(`${backendUrl}/auth/me`, {
-                  headers: { 'Authorization': `Bearer ${activeToken}` },
-                  mode: 'cors',
-                });
-
-                if (response.ok) {
-                  const freshUserData = await response.json();
-                  setUser(freshUserData);
-                  localStorage.setItem('user_data', JSON.stringify(freshUserData));
-                } else {
-                  console.warn(`[Auth Init] Token verification failed (status: ${response.status}). Logging out.`);
-                  logout();
-                  activeToken = null;
-                }
-            } catch (error) {
-                console.error('[Auth Init] Network error during token verification:', error);
-            }
-        } else {
-           setToken(null);
-           setUser(null);
-        }
-
-      } catch (error) {
-        console.error('[Auth Init] Error during auth initialization:', error);
-        setToken(null);
-        setUser(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initAuth();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const value = {
-    user,
-    token,
+  const value: AppAuthContextType = {
+    // Use optional chaining and type assertion as needed
+    user: session?.user as (UserProfile & { id: string }) | null | undefined,
+    token: session?.accessToken,
     isLoading,
-    isAuthenticated: !!token,
+    isAuthenticated,
     login,
     logout,
-    register,
+    register, // Include your custom register function
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AppAuthContext.Provider value={value}>{children}</AppAuthContext.Provider>;
 };
 
-export default AuthContext;
+// The main AuthProvider that wraps everything in NextAuth's SessionProvider
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  return (
+    <SessionProvider> {/* Removed refetchInterval for simplicity, add if needed */}
+      <AuthProviderInternal>{children}</AuthProviderInternal>
+    </SessionProvider>
+  );
+};
+
+export default AppAuthContext; // Export the context itself if needed elsewhere

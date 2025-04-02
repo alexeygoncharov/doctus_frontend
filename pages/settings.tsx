@@ -6,14 +6,16 @@ import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { AvatarContext } from './_app';
 import { SubscriptionSection } from '../components/subscription/SubscriptionSection';
-import { useAuth } from '../lib/auth-context';
+import { useSession } from 'next-auth/react'; // Import useSession
+// import { useAuth } from '../lib/auth-context'; // Remove old useAuth import
 import { 
   getUserProfile, 
   updateUserProfile, 
   uploadFile, 
   UserUpdate, 
+  UserProfile,
   getBackendUrl,
-  changePassword,
+  changePassword, 
   PasswordChangeData,
   getPlans,
   getCurrentSubscription,
@@ -27,9 +29,35 @@ import {
 import ProtectedRoute from '../components/auth/ProtectedRoute';
 
 const SettingsPage = () => {
-  const { user, token, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { data: session, status, update } = useSession(); // Use useSession directly and get update function
+  const user = session?.user; // Remove the explicit type assertion for now
+  const isLoadingSession = status === 'loading';
+  const isAuthenticated = status === 'authenticated';
+
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('profile');
+  
+  // Добавляем локальное состояние для хранения URL аватара из localStorage
+  const [localAvatarUrl, setLocalAvatarUrl] = useState<string | null>(null);
+  
+  // Загружаем аватар из localStorage при первом рендере
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedAvatar = localStorage.getItem('userAvatar');
+      if (storedAvatar) {
+        setLocalAvatarUrl(storedAvatar);
+        console.log('Аватар загружен из localStorage на странице настроек:', storedAvatar);
+      }
+    }
+  }, []);
+  
+  // Обновляем локальное состояние при изменении user?.avatar
+  useEffect(() => {
+    if (user?.avatar) {
+      setLocalAvatarUrl(user.avatar);
+    }
+  }, [user?.avatar]);
+
   const [plans, setPlans] = useState<PlanResponse[]>([]);
   {/* Убираем локальное хранение strapiPlans, так как они теперь хранятся в компоненте PricingModal */}
   const [subscription, setSubscription] = useState<SubscriptionResponse | null>(null);
@@ -103,18 +131,24 @@ const SettingsPage = () => {
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Загружаем данные с сервера при загрузке компонента
+  // Загружаем данные с сервера при загрузке компонента и когда сессия установлена
   useEffect(() => {
-    // Добавлено условие, чтобы не выполнять запрос, если пользователь не авторизован
-    if (user?.id && isAuthenticated) {
-      // Запрашиваем данные с сервера
+    // Выполняем только когда сессия загружена и пользователь аутентифицирован
+    if (isAuthenticated && user?.id) {
+      console.log('==== ОТЛАДКА СЕССИИ ====');
+      console.log('Session user object on load:', JSON.stringify(session?.user, null, 2));
+      console.log('session.user.avatar:', session?.user?.avatar);
+      console.log('======== КОНЕЦ ========');
+      console.log('Session authenticated, fetching user profile and subscription...');
       fetchUserProfile(user.id);
       fetchSubscriptionData();
-      
-      // Выводим доступные данные из пользователя
-      console.log('User data:', user);
+    } else if (!isLoadingSession && !isAuthenticated) {
+        console.log('Session loaded, but user is not authenticated.');
+    } else {
+        console.log('Waiting for session authentication...');
     }
-  }, [user, isAuthenticated]);
+    // Добавляем session в зависимости, чтобы отследить его изменения
+  }, [isAuthenticated, user?.id, isLoadingSession, session]);
   
   // Функция загрузки данных о подписке
   const fetchSubscriptionData = async () => {
@@ -222,6 +256,9 @@ const SettingsPage = () => {
         formData.append('file', file);
         formData.append('folder', 'user_avatars');
         
+        // Получаем токен из сессии
+        const token = session?.accessToken;
+        
         // Отправляем запрос
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/upload`, {
           method: 'POST',
@@ -247,14 +284,9 @@ const SettingsPage = () => {
           
           await updateUserProfile(Number(user.id), userData);
           
-          // Обновляем локальную сессию через механизм next-auth
-          await updateSession({
-            user: {
-              ...user,
-              image: avatarUrl
-            }
-          });
-          
+          // Обновляем сессию NextAuth
+          await update({ user: { avatar: avatarUrl } });
+
           // Обновляем аватар в контексте приложения
           updateAvatar(avatarUrl);
           
@@ -266,6 +298,23 @@ const SettingsPage = () => {
           // Добавляем в localStorage для сохранения между сессиями
           if (typeof window !== 'undefined') {
             localStorage.setItem('userAvatar', avatarUrl);
+            
+            // НОВЫЙ КОД: Принудительно обновляем все аватары в DOM
+            // Это обходное решение на случай, если обновление через сессию/контекст не сработает
+            const avatarElements = document.querySelectorAll('img[alt="'+user.name+'"]');
+            console.log('Найдено элементов аватаров для обновления:', avatarElements.length);
+            
+            avatarElements.forEach(element => {
+              const fullUrl = avatarUrl.startsWith('http') 
+                ? avatarUrl 
+                : getBackendUrl(avatarUrl);
+              
+              console.log('Принудительное обновление элемента аватара с URL:', fullUrl);
+              // Обновляем атрибут src
+              (element as HTMLImageElement).src = fullUrl;
+              // Также меняем background-image для элементов со стилями
+              (element as HTMLElement).style.backgroundImage = `url(${fullUrl})`;
+            });
           }
           
           // Показываем сообщение об успехе
@@ -465,6 +514,31 @@ const SettingsPage = () => {
     return date.toLocaleDateString('ru-RU');
   };
   
+  // Добавляем эффект для логирования аватарки при рендере
+  useEffect(() => {
+    if (user?.avatar || avatarFile || localAvatarUrl) {
+      console.log('==== ОТЛАДКА АВАТАРКИ В НАСТРОЙКАХ ====');
+      console.log('Рендер аватарки. user?.avatar:', user?.avatar);
+      console.log('Рендер аватарки. localAvatarUrl:', localAvatarUrl);
+      console.log('Рендер аватарки. avatarFile:', avatarFile ? 'present' : 'null');
+      
+      const avatarSource = avatarFile 
+        ? URL.createObjectURL(avatarFile) 
+        : (user?.avatar 
+            ? (user.avatar.startsWith('http') 
+                ? user.avatar 
+                : getBackendUrl(user.avatar))
+            : localAvatarUrl
+              ? (localAvatarUrl.startsWith('http')
+                  ? localAvatarUrl
+                  : getBackendUrl(localAvatarUrl))
+              : '');
+      
+      console.log('Рендер аватарки. Итоговый URL для отображения:', avatarSource);
+      console.log('==== КОНЕЦ ОТЛАДКИ АВАТАРКИ В НАСТРОЙКАХ ====');
+    }
+  }, [user?.avatar, avatarFile, localAvatarUrl]);
+
   return (
     <>
       <Head>
@@ -493,20 +567,36 @@ const SettingsPage = () => {
               <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 min-w-[64px] min-h-[64px] rounded-full overflow-hidden relative group cursor-pointer" onClick={handleAvatarClick} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {user?.image || avatarFile ? (
+                    {avatarFile || user?.avatar || localAvatarUrl ? (
                       <>
                         <Image 
                           src={avatarFile 
                             ? URL.createObjectURL(avatarFile) 
-                            : (user?.image 
-                                ? (user.image.startsWith('http') 
-                                    ? user.image 
-                                    : getBackendUrl(user.image))
-                                : '')} 
+                            : (user?.avatar 
+                                ? (user.avatar.startsWith('http') 
+                                    ? user.avatar 
+                                    : getBackendUrl(user.avatar))
+                                : localAvatarUrl
+                                  ? (localAvatarUrl.startsWith('http')
+                                      ? localAvatarUrl
+                                      : getBackendUrl(localAvatarUrl))
+                                  : '')} 
                           alt={user?.name || 'Пользователь'} 
                           className="object-cover w-full h-full rounded-full" 
                           width={64} 
-                          height={64} 
+                          height={64}
+                          onError={(e) => {
+                            console.error('Ошибка загрузки аватара в settings:', e.currentTarget.src);
+                            e.currentTarget.style.display = 'none';
+                            // Восстанавливаем отображение инициалов при ошибке
+                            const container = e.currentTarget.parentElement;
+                            if (container) {
+                              const fallback = document.createElement('div');
+                              fallback.className = "w-full h-full bg-blue-100 flex items-center justify-center text-blue-500 text-2xl group-hover:opacity-80 transition-opacity rounded-full";
+                              fallback.textContent = user?.name?.[0].toUpperCase() || 'У';
+                              container.appendChild(fallback);
+                            }
+                          }}
                         />
                         <div className={`absolute inset-0 flex items-center justify-center ${isLoading ? 'bg-black bg-opacity-70 opacity-100' : 'bg-black bg-opacity-50 opacity-0 group-hover:opacity-100'} transition-opacity rounded-full`}>
                           {isLoading ? (

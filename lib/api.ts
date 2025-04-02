@@ -2,8 +2,9 @@ import { Message } from "./types";
 import { Doctor } from "./doctors";
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { getSession } from 'next-auth/react'; // Import getSession
 
-// User interfaces
+// User interfaces (keep as is)
 export interface MedicalProfile {
   gender?: string;
   birth_date?: string | null;
@@ -15,14 +16,14 @@ export interface MedicalProfile {
 }
 
 export interface UserProfile {
-  id: number;
-  name: string;
+  id: number | string; // Can be number or string
+  name?: string | null;
   email: string;
-  phone?: string;
-  avatar?: string;
-  role: string;
-  created_at: string;
-  is_active: boolean;
+  phone?: string | null;
+  avatar?: string | null;
+  role?: string;
+  created_at?: string;
+  is_active?: boolean;
   medical_profile?: MedicalProfile;
   subscription?: SubscriptionResponse;
 }
@@ -34,29 +35,55 @@ export interface UserUpdate {
 }
 
 // API URLs
-const API_URL = 'https://backend.doctus.chat';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend.doctus.chat';
 
 // Use direct backend URL for browser requests
-// WARNING: Requires backend CORS configuration
-const BROWSER_API_URL = API_URL; // <- Always use direct URL
+const BROWSER_API_URL = API_URL;
 
 // For direct server assets like images
 const SERVER_URL = API_URL;
 
 // Helper to get full URL for backend resources
-export const getBackendUrl = (path: string) => {
-  if (path?.startsWith('http')) return path;
+export const getBackendUrl = (path: string | null | undefined): string => {
+  console.log('==== ОТЛАДКА getBackendUrl ====');
+  console.log('Input path:', path);
+  console.log('SERVER_URL:', SERVER_URL);
   
-  // For other API requests, use the backend URL directly
-  if (path?.startsWith('/')) {
-    return `${SERVER_URL}${path}`;
-  } else {
-    return `${SERVER_URL}/${path}`;
+  if (!path) {
+    console.log('Path is null or undefined, returning empty string');
+    console.log('==== КОНЕЦ ОТЛАДКИ getBackendUrl ====');
+    return ''; 
   }
+  
+  if (path.startsWith('http')) {
+    console.log('Path already starts with http, returning as is');
+    console.log('==== КОНЕЦ ОТЛАДКИ getBackendUrl ====');
+    return path;
+  }
+
+  // Ensure path starts with a slash if it's relative
+  const correctedPath = path.startsWith('/') ? path : `/${path}`;
+  
+  // Add debug log to see what is happening with the URL construction
+  const fullUrl = `${SERVER_URL}${correctedPath}`;
+  console.log('Corrected path:', correctedPath);
+  console.log('Full URL constructed:', fullUrl);
+  console.log('==== КОНЕЦ ОТЛАДКИ getBackendUrl ====');
+  
+  return fullUrl;
 };
+
 
 // Класс для работы с API
 export class ApiClient {
+
+  // Helper function to get the current session's access token
+  public static async getAuthToken(): Promise<string | null> {
+    const session = await getSession();
+    // Use type assertion if you extended the Session type
+    return (session as any)?.accessToken || null;
+  }
+
   static async get(url: string, options: RequestInit = {}) {
     return this.request(url, {
       method: 'GET',
@@ -95,101 +122,131 @@ export class ApiClient {
     });
   }
 
+  // Central request method
   static async request(url: string, options: RequestInit = {}) {
-    // Формируем заголовки для запроса
+    // Get token using NextAuth's getSession
+    const token = await this.getAuthToken();
+
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string>),
     };
-    
-    // Получаем токен из localStorage
-    if (typeof window !== 'undefined') {
-      const storedToken = localStorage.getItem('auth_token');
-      if (storedToken) {
-        headers['Authorization'] = `Bearer ${storedToken}`;
-      }
+
+    // Add Authorization header if token exists
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
-    // Если это FormData, не устанавливаем content-type, чтобы браузер сам добавил boundary
+    // Set default Content-Type if not FormData
+    if (!(options.body instanceof FormData) && !headers['Content-Type']) {
+       headers['Content-Type'] = 'application/json';
+    }
+
+    // Remove Content-Type if it's FormData (browser sets it with boundary)
     if (options.body instanceof FormData) {
       delete headers['Content-Type'];
     }
 
-    // Проверяем, не является ли URL полным путем
     const isFullUrl = url.startsWith('http://') || url.startsWith('https://');
-    
-    // Используем прямой URL к бэкенду для клиентских запросов
-    // или прямой URL если он полный
     const apiUrlToUse = isFullUrl ? url : `${BROWSER_API_URL}${url}`;
-    
+
     try {
       console.log(`Making API request to: ${apiUrlToUse}`);
-      
-      // Выполняем запрос напрямую к API
+      // console.log("With headers:", headers); // Optional: Log headers for debugging
+
       const response = await fetch(apiUrlToUse, {
         ...options,
         headers,
-        mode: 'cors', // Явно указываем режим CORS для прямых запросов к бэкенду
+        mode: 'cors', // Ensure CORS is enabled
       });
 
-      // Обрабатываем ошибки
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ detail: 'Произошла ошибка' }));
-        console.error('API Error:', error);
-        
-        // Форматируем детали ошибки для лучшего отображения
-        let errorMessage = 'Произошла ошибка при запросе к API';
-        
-        if (error.detail) {
-          if (Array.isArray(error.detail)) {
-            // Если ошибка - массив сообщений, объединяем их
-            errorMessage = error.detail.map((err: unknown) => {
-              if (typeof err === 'object') {
-                return JSON.stringify(err);
-              }
-              return err;
-            }).join(', ');
+         let errorBody: any = null;
+         try {
+             errorBody = await response.json();
+             console.error('API Error Body:', errorBody);
+         } catch (e) {
+             // If response is not JSON, read as text
+             const errorText = await response.text();
+             console.error('API Error Text:', errorText);
+             errorBody = { detail: errorText || `Request failed with status ${response.status}` };
+         }
+
+        // Extract detailed error message
+        let errorMessage = 'API Request Failed';
+        if (errorBody && errorBody.detail) {
+          if (Array.isArray(errorBody.detail)) {
+            errorMessage = errorBody.detail.map((err: any) => err.msg || JSON.stringify(err)).join(', ');
           } else {
-            // Иначе используем строку
-            errorMessage = error.detail;
+            errorMessage = errorBody.detail;
           }
+        } else {
+            errorMessage = `HTTP error ${response.status}`;
         }
-        
+
+        // Special handling for 401 Unauthorized
+        if (response.status === 401) {
+            console.warn("API request unauthorized (401). Token might be invalid or expired.");
+            errorMessage = "Not authenticated"; // Consistent error message
+            // Optionally trigger sign-out or refresh token logic here if needed globally
+            // import { signOut } from 'next-auth/react';
+            // signOut();
+        }
+
         throw new Error(errorMessage);
       }
 
-      // Возвращаем результат
+      // Handle responses with no content (like 204 No Content)
+      if (response.status === 204) {
+        return null; // Or return an empty object/success indicator
+      }
+
+      // Assuming successful responses are JSON
       return response.json();
+
     } catch (error) {
       console.error('API Request Error:', error);
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        throw new Error('Не удалось соединиться с сервером. Пожалуйста, проверьте подключение к интернету или обратитесь к администратору.');
+        throw new Error('Не удалось соединиться с сервером. Проверьте подключение.');
       }
+      // Re-throw the processed error or the original error
       throw error;
     }
   }
 }
 
-// User-related functions
-export async function getUserProfile(userId: number): Promise<UserProfile> {
-  // Прямой запрос к бэкенду без промежуточного API роута
-  console.log(`Fetching user profile from ${API_URL}/users/${userId}`);
+// --- User Functions (using updated ApiClient) ---
+
+export async function getMyProfile(): Promise<UserProfile> {
+  console.log(`Fetching current user profile from ${API_URL}/auth/me`);
+  // Assuming /auth/me returns the UserProfile structure
+  return ApiClient.get('/auth/me');
+}
+
+// Keep this if you need to get profile by specific ID (e.g., admin functionality)
+export async function getUserProfile(userId: string | number): Promise<UserProfile> {
+  console.log(`Fetching user profile for ID ${userId} from ${API_URL}/users/${userId}`);
   return ApiClient.get(`/users/${userId}`);
 }
 
-export async function updateUserProfile(userId: number, userData: UserUpdate): Promise<UserProfile> {
-  // Прямой запрос к бэкенду без промежуточного API роута
-  console.log(`Updating user profile at ${API_URL}/users/${userId} with data:`, userData);
+
+export async function updateUserProfile(userId: string | number, userData: UserUpdate): Promise<UserProfile> {
+  console.log(`Updating user profile for ID ${userId} at ${API_URL}/users/${userId}`);
   return ApiClient.put(`/users/${userId}`, userData);
 }
 
+// --- File Upload (No auth token needed based on previous logic? Double-check backend requirements) ---
+// Assuming /api/upload is a NEXTJS api route, not direct backend
+// If it's direct backend, ApiClient.request will now add token if available.
+// If it SHOULDN'T have a token, adjust ApiClient.request or call fetch directly.
 export async function uploadFile(file: File, folder: string = ''): Promise<{url: string}> {
   const formData = new FormData();
   formData.append('file', file);
   if (folder) {
     formData.append('folder', folder);
   }
-  // Используем относительный путь, ApiClient добавит API_URL
-  return ApiClient.request('/api/upload', {
+  // This now uses ApiClient.request, which includes the token
+  // Check if /files/upload requires authentication on your backend
+  return ApiClient.request('/files/upload', { // Changed endpoint based on your backend structure
     method: 'POST',
     body: formData
   });
@@ -201,99 +258,56 @@ export interface PasswordChangeData {
 }
 
 export async function changePassword(passwordData: PasswordChangeData): Promise<{message: string}> {
-  console.log('Changing password with data:', { ...passwordData, current_password: '***', new_password: '***' });
+  console.log('Changing password...');
+  // This uses ApiClient.post, which includes the token
   return ApiClient.post('/auth/change-password', passwordData);
 }
 
-// Subscription interfaces
-export interface PlanResponse {
-  id: number;
-  name: string;
-  description: string;
-  type: string;
-  price: number;
-  doctors_limit: number;
-  is_recommended: boolean;
-  trial_days: number;
-}
+// --- Subscription Interfaces (keep as is) ---
+export interface PlanResponse { id: number; name: string; description: string; type: string; price: number; doctors_limit: number; is_recommended: boolean; trial_days: number; benefits: string; price_3m: number | null; price_6m: number | null; price_12m: number | null; valid_days: number | null; }
+export interface StrapiPlan { id: number; documentId: string; name: string; price: number; valid_days: number | null; createdAt: string; updatedAt: string; publishedAt: string; benefits: string; price_3m: number | null; price_6m: number | null; price_12m: number | null; }
+export interface StrapiPlansResponse { data: StrapiPlan[]; meta: { pagination: { page: number; pageSize: number; pageCount: number; total: number; } } }
+export interface SubscriptionResponse { id: number; user_id: number; plan_id: number; start_date: string; end_date: string; is_active: boolean; plan: PlanResponse; }
+export interface SubscriptionCreate { plan_id: number; }
 
-// Strapi Plan interfaces
-export interface StrapiPlan {
-  id: number;
-  documentId: string;
-  name: string;
-  price: number;
-  valid_days: number | null;
-  createdAt: string;
-  updatedAt: string;
-  publishedAt: string;
-  benefits: string;
-  price_3m: number | null;
-  price_6m: number | null;
-  price_12m: number | null;
-}
+// --- Subscription Functions (using updated ApiClient) ---
 
-export interface StrapiPlansResponse {
-  data: StrapiPlan[];
-  meta: {
-    pagination: {
-      page: number;
-      pageSize: number;
-      pageCount: number;
-      total: number;
-    }
-  }
-}
-
-export interface SubscriptionResponse {
-  id: number;
-  user_id: number;
-  plan_id: number;
-  start_date: string;
-  end_date: string;
-  is_active: boolean;
-  plan: PlanResponse;
-}
-
-export interface SubscriptionCreate {
-  plan_id: number;
-}
-
-// Subscription functions
+// Public plans endpoint - Should not require authentication
 export async function getPlans(): Promise<PlanResponse[]> {
   try {
-    // Используем прямой URL к бэкенду через ApiClient
     console.log(`Fetching plans from: ${API_URL}/public/plans`);
-    return await ApiClient.get('/public/plans');
+    // Use fetch directly to avoid sending auth token for public endpoint
+    const response = await fetch(`${API_URL}/public/plans`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch public plans: ${response.status}`);
+    }
+    return response.json();
+    // If ApiClient should handle public/private automatically, refactor needed
+    // return await ApiClient.get('/public/plans'); // This would send token if logged in
   } catch (error) {
     console.error('Error fetching plans:', error);
     throw error;
   }
 }
 
-// Get plans from our backend API
+// Keep this transformation logic if frontend relies on StrapiPlan structure
 export async function getStrapiPlans(): Promise<StrapiPlansResponse> {
   try {
-    // Use our backend API instead of Strapi
-    const plans = await ApiClient.get('/public/plans');
-    
-    // Transform PlanResponse to StrapiPlan format for frontend compatibility
-    const transformedPlans = plans.map((plan: any) => ({
+    const plans = await getPlans(); // Use the updated getPlans
+    const transformedPlans = plans.map((plan: PlanResponse): StrapiPlan => ({
       id: plan.id,
       documentId: plan.id.toString(),
       name: plan.name,
       price: plan.price,
-      valid_days: plan.valid_days,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      publishedAt: new Date().toISOString(),
-      benefits: plan.benefits,
-      price_3m: plan.price_3m,
-      price_6m: plan.price_6m,
-      price_12m: plan.price_12m
+      valid_days: plan.valid_days ?? null,
+      createdAt: new Date().toISOString(), // Placeholder date
+      updatedAt: new Date().toISOString(), // Placeholder date
+      publishedAt: new Date().toISOString(), // Placeholder date
+      benefits: plan.benefits ?? '',
+      price_3m: plan.price_3m ?? null,
+      price_6m: plan.price_6m ?? null,
+      price_12m: plan.price_12m ?? null,
     }));
-    
-    // Return in the same format as Strapi API response
     return {
       data: transformedPlans,
       meta: {
@@ -306,551 +320,347 @@ export async function getStrapiPlans(): Promise<StrapiPlansResponse> {
       }
     };
   } catch (error) {
-    console.error('Error fetching plans from backend:', error);
+    console.error('Error fetching/transforming plans:', error);
     throw new Error(`Error fetching plans: ${error}`);
   }
 }
 
-export async function getCurrentSubscription(): Promise<SubscriptionResponse> {
-  return ApiClient.get('/subscriptions/current');
+// Authenticated endpoint
+export async function getCurrentSubscription(): Promise<SubscriptionResponse | null> { // Allow null return
+  try {
+      return await ApiClient.get('/subscriptions/current');
+  } catch (error) {
+      if (error instanceof Error && error.message === 'Not authenticated') {
+          console.log('No active session or subscription not found (401).');
+          return null; // Return null instead of throwing for 401
+      }
+      if (error instanceof Error && error.message.includes('404')) { // Handle 404 if backend returns that for no subscription
+          console.log('No active subscription found (404).');
+          return null;
+      }
+      console.error('Error fetching current subscription:', error);
+      throw error; // Re-throw other errors
+  }
 }
 
+// Authenticated endpoint
 export async function subscribeToPlan(
   planId: number,
-  strapiPlanId?: number,
+  strapiPlanId?: number, // Keep for compatibility if needed
   periodMonths: string = '1m'
 ): Promise<SubscriptionResponse> {
-  // Преобразуем период из строки в число
-  const periodMap: Record<string, number> = {
-    '1m': 1,
-    '3m': 3,
-    '6m': 6,
-    '12m': 12
-  };
-  
+  const periodMap: Record<string, number> = { '1m': 1, '3m': 3, '6m': 6, '12m': 12 };
   const period_months = periodMap[periodMonths] || 1;
-  
-  return ApiClient.post('/plans/subscribe', { 
+
+  return ApiClient.post('/plans/subscribe', {
     plan_id: planId,
-    // Здесь strapi_plan_id становится нашим planId, поскольку мы больше не используем Strapi
-    // но сохраняем для совместимости с существующим кодом
-    strapi_plan_id: planId,
+    strapi_plan_id: strapiPlanId || planId, // Use planId as fallback
     period_months
   });
 }
 
+// Authenticated endpoint
 export async function cancelSubscription(): Promise<SubscriptionResponse> {
   return ApiClient.delete('/subscriptions/cancel');
 }
 
-// Реальная имплементация отправки сообщений докторам
+// --- Chat Functions (using updated ApiClient where appropriate) ---
+
+// Needs careful review based on authentication requirements for doctor 20
 export async function sendMessage(doctorId: string | number, message: string, files: any[] = [], chatId?: number | null): Promise<Message> {
   try {
-    console.log("Sending message to doctor, files:", files);
-    
-    // Создаем формат сообщения для отправки на сервер
     const messageData = {
-      role: "user",
+      role: "user" as const,
       content: message,
-      files: files && Array.isArray(files) ? files.map(file => file?.id || file) : [] // Отправляем только ID файлов с проверкой на существование и тип
+      files: files?.map(file => file?.id || file).filter(id => id) ?? [] // Ensure only valid IDs
     };
-    
-    // Дополнительная проверка файлов для отладки
-    if (files && files.length > 0) {
-      console.log("Files being sent with message:", 
-        files.map(file => ({
-          id: file?.id || file,
-          type: typeof file,
-          details: file
-        }))
-      );
-    }
 
-    // Если chatId не передан, проверяем существует ли уже чат с этим доктором
-    if (!chatId) {
+    let effectiveChatId = chatId;
+    if (!effectiveChatId) {
       try {
-        // Получаем список чатов
-        const chats = await ApiClient.get('/chats');
-        // Ищем чат с нужным доктором
+        const chats = await ApiClient.get('/chats'); // Requires auth
         const existingChat = chats.find((chat: any) => chat.doctor_id.toString() === doctorId.toString());
         if (existingChat) {
-          chatId = existingChat.id;
+          effectiveChatId = existingChat.id;
         }
       } catch (error) {
-        console.error("Error fetching chats:", error);
-        // Продолжаем выполнение, используя прямой эндпоинт к доктору
+        console.error("Error fetching chats (might be expected if not logged in):", error);
+        // Proceed without chatId if fetching fails (e.g., for doctor 20)
       }
     }
 
-    // Используем StreamingResponse для получения потокового ответа
-    let streamUrl: string;
-    
-    if (chatId) {
-      // Если нашли существующий чат или передали chatId, используем его ID
-      streamUrl = `${API_URL}/chats/${chatId}/messages/stream`;
-    } else {
-      // Иначе используем прямой эндпоинт к доктору
-      streamUrl = `${API_URL}/chats/doctor/${doctorId}/messages/stream`;
-    }
-    
-    // Создаем ID для нового сообщения (для фронтенда)
+    const streamUrl = effectiveChatId
+      ? `${API_URL}/chats/${effectiveChatId}/messages/stream`
+      : `${API_URL}/chats/doctor/${doctorId}/messages/stream`;
+
     const messageId = crypto.randomUUID();
-    
-    // Специальное исключение для доктора "Расшифровка" (ID 20)
     const isDecodeDoctor = doctorId.toString() === '20';
-    
-    // Настраиваем заголовки в зависимости от доктора
-    // Для доктора "Расшифровка" не требуем авторизации
+    const token = await ApiClient.getAuthToken(); // Get token using the helper
+
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'Accept': 'text/event-stream' // Important for SSE
     };
-    
-    // Получаем токен авторизации из localStorage
-    const storedToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-    
-    // Добавляем токен авторизации, если он есть
-    if (storedToken) {
-      headers['Authorization'] = `Bearer ${storedToken}`;
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     } else if (!isDecodeDoctor) {
-      // Для всех докторов кроме "Расшифровка" требуется авторизация
-      throw new Error("Требуется авторизация для отправки сообщений");
+      throw new Error("Требуется авторизация для отправки сообщений этому доктору.");
     }
 
-    // Отправляем запрос и обрабатываем настоящий StreamingResponse
+    // Use fetch directly for streaming response handling
     const response = await fetch(streamUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify(messageData)
+      body: JSON.stringify(messageData),
+      mode: 'cors'
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Server response error: ${response.status}`, errorText);
-      throw new Error(`Error sending message: ${response.status}`);
+      throw new Error(`Error sending message: ${response.status} - ${errorText}`);
     }
 
-    // Создаем объект сообщения, который будем обновлять по мере получения данных
     const streamingMessage: Message = {
       id: messageId,
       role: "assistant",
-      content: "", // Начинаем с пустого содержимого, которое будем постепенно заполнять
+      content: "",
       timestamp: new Date(),
-      isStreaming: true, // Специальный флаг для обозначения, что сообщение в процессе стриминга
+      isStreaming: true,
     };
 
-    // Создаем читатель для обработки потокового ответа
     const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error("Не удалось создать reader для потокового ответа");
-    }
+    if (!reader) throw new Error("Не удалось получить reader для потока.");
 
-    // Запускаем отдельный процесс для чтения потока
-    // Но сразу возвращаем объект сообщения, чтобы UI мог его отобразить
+    // Process stream in background, return initial message object immediately
     (async () => {
-      try {
         const decoder = new TextDecoder();
         let done = false;
         let fullResponse = "";
-
-        while (!done) {
-          const { value, done: doneReading } = await reader.read();
-          done = doneReading;
-          
-          if (value) {
-            const chunk = decoder.decode(value, { stream: true });
-            
-            // Разделяем входящий текст целыми предложениями или частями
-            fullResponse += chunk;
-            
-            // Отправляем событие с обновленным текстом
-            const updateEvent = new CustomEvent('chat-message-update', {
-              detail: {
-                id: messageId,
-                content: fullResponse
-              }
-            });
-            window.dispatchEvent(updateEvent);
-            
-            // Короткая задержка для более естественного эффекта 
-            await new Promise(resolve => setTimeout(resolve, 30));
-          }
+        try {
+            while (!done) {
+                const { value, done: doneReading } = await reader.read();
+                done = doneReading;
+                if (value) {
+                    const chunk = decoder.decode(value, { stream: true });
+                    fullResponse += chunk;
+                    // Dispatch update event
+                    window.dispatchEvent(new CustomEvent('chat-message-update', {
+                        detail: { id: messageId, content: fullResponse }
+                    }));
+                    await new Promise(resolve => setTimeout(resolve, 30)); // Small delay
+                }
+            }
+            // Dispatch final event
+            window.dispatchEvent(new CustomEvent('chat-message-complete', {
+                detail: { id: messageId, content: fullResponse, isStreaming: false }
+            }));
+        } catch (error) {
+             console.error("Error processing stream:", error);
+             window.dispatchEvent(new CustomEvent('chat-message-error', {
+                 detail: { id: messageId, error: error instanceof Error ? error.message : 'Ошибка обработки потока' }
+             }));
         }
-
-        // Когда стриминг закончен, отправляем финальное событие
-        const finalEvent = new CustomEvent('chat-message-complete', {
-          detail: {
-            id: messageId,
-            content: fullResponse,
-            isStreaming: false
-          }
-        });
-        window.dispatchEvent(finalEvent);
-
-      } catch (error) {
-        console.error("Error processing stream:", error);
-        
-        // Отправляем событие об ошибке
-        const errorEvent = new CustomEvent('chat-message-error', {
-          detail: {
-            id: messageId,
-            error: error instanceof Error ? error.message : 'Ошибка при получении ответа'
-          }
-        });
-        window.dispatchEvent(errorEvent);
-      }
     })();
 
     return streamingMessage;
+
   } catch (error) {
-    console.error("Error sending message:", error);
-    
-    // В случае ошибки возвращаем сообщение об ошибке
+    console.error("Error in sendMessage:", error);
     return {
       id: crypto.randomUUID(),
       role: "assistant",
-      content: `Произошла ошибка при отправке сообщения: ${error instanceof Error ? error.message : String(error)}`,
+      content: `Ошибка: ${error instanceof Error ? error.message : String(error)}`,
       timestamp: new Date(),
     };
   }
 }
 
-// Функция для получения списка докторов из API
+// Public endpoint - Should not require authentication
 export async function getDoctors() {
   try {
-    // Используем прямой URL к бэкенду через ApiClient
     console.log(`Fetching doctors from: ${API_URL}/public/doctors`);
-    const data = await ApiClient.get('/public/doctors');
-    
+    // Use fetch directly
+    const response = await fetch(`${API_URL}/public/doctors`);
+     if (!response.ok) {
+        throw new Error(`Failed to fetch public doctors: ${response.status}`);
+    }
+    const data = await response.json();
     console.log('Doctors data received:', data);
     return data;
   } catch (error) {
     console.error('Error fetching doctors:', error);
-    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-      console.error('Network error - check if the backend server is running and accessible');
-    }
-    // Возвращаем пустой массив в случае ошибки, чтобы избежать краша UI
-    return [];
+    return []; // Return empty array on error
   }
 }
 
+// Public endpoint - Should not require authentication
 export async function getDoctorBySlug(slug: string) {
   try {
-    // Используем прямой URL к бэкенду через ApiClient
     console.log(`Fetching doctor by slug from: ${API_URL}/doctors/public/by-slug/${slug}`);
-    return await ApiClient.get(`/doctors/public/by-slug/${slug}`);
+    // Use fetch directly
+    const response = await fetch(`${API_URL}/doctors/public/by-slug/${slug}`);
+     if (!response.ok) {
+        throw new Error(`Failed to fetch doctor by slug ${slug}: ${response.status}`);
+    }
+    return await response.json();
   } catch (error) {
     console.error('Error fetching doctor by slug:', error);
     throw error;
   }
 }
 
-// Загрузка чатов пользователя
+// Authenticated endpoint
 export async function getUserChats() {
   try {
-    // Проверяем наличие токена перед запросом
-    const storedToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-    if (!storedToken) {
-      console.warn('Auth token not found, unable to fetch chats');
-      return [];
-    }
-    
     return await ApiClient.get('/chats');
   } catch (error) {
+     if (error instanceof Error && error.message === 'Not authenticated') {
+          console.log('Cannot fetch chats: User not authenticated.');
+          return []; // Return empty array if not authenticated
+      }
     console.error('Error fetching user chats:', error);
-    // Возвращаем пустой массив вместо ошибки, чтобы не прерывать цепочку выполнения
-    return [];
+    return []; // Return empty array on other errors too
   }
 }
 
-// Загрузка сообщений для конкретного чата
+// Authenticated endpoint
 export async function getChatMessages(chatId: number, skip: number = 0, limit: number = 100) {
   try {
-    // Проверяем наличие токена перед запросом
-    const storedToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-    if (!storedToken) {
-      console.warn('Auth token not found, unable to fetch chat messages');
-      return [];
-    }
-    
     return await ApiClient.get(`/chats/${chatId}/messages?skip=${skip}&limit=${limit}`);
   } catch (error) {
+       if (error instanceof Error && error.message === 'Not authenticated') {
+          console.log(`Cannot fetch messages for chat ${chatId}: User not authenticated.`);
+          return []; // Return empty array if not authenticated
+      }
     console.error(`Error fetching messages for chat ${chatId}:`, error);
-    // Возвращаем пустой массив вместо ошибки, чтобы не прерывать цепочку выполнения
     return [];
   }
 }
 
-// Создание нового чата с доктором
+// Authenticated endpoint (except potentially for doctor 20)
 export async function createChat(doctorId: number) {
   try {
     console.log(`Creating chat with doctor ID ${doctorId}`);
-    
-    // Специальное исключение для доктора "Расшифровка" (ID 20)
     const isDecodeDoctor = doctorId === 20;
-    
-    // Получаем токен авторизации из localStorage
-    const storedToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-    
-    // Для неавторизованной работы с доктором Расшифровка
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-    
-    // Добавляем токен авторизации, если он есть
-    if (storedToken) {
-      headers['Authorization'] = `Bearer ${storedToken}`;
-    } else if (!isDecodeDoctor) {
-      // Для всех докторов кроме "Расшифровка" требуется авторизация
-      throw new Error("Требуется авторизация для создания чата");
+    const token = await ApiClient.getAuthToken();
+
+    if (!token && !isDecodeDoctor) {
+        throw new Error("Требуется авторизация для создания этого чата.");
     }
-    
-    // Прямой запрос без использования ApiClient для обхода проверки авторизации
-    const response = await fetch(`${API_URL}/chats`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ doctor_id: doctorId }),
-      mode: 'cors'
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Server response error: ${response.status}`, errorText);
-      throw new Error(`Error creating chat: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    console.log(`Chat created successfully: ${JSON.stringify(result)}`);
-    return result;
+    // Use ApiClient which will handle the token correctly
+    return await ApiClient.post('/chats', { doctor_id: doctorId });
+
   } catch (error) {
     console.error(`Error creating chat with doctor ${doctorId}:`, error);
     throw error;
   }
 }
 
-// Загрузка файлов для чата
+// Authenticated endpoint
 export async function uploadChatFiles(chatId: number, files: File[], fileType: 'image' | 'document' = 'image') {
   try {
-    console.log("DEBUG: Uploading files to chat", {
-      chatId,
-      fileCount: files.length,
-      fileNames: files.map(f => f.name),
-      fileTypes: files.map(f => f.type),
-      fileExtensions: files.map(f => f.name.split('.').pop()?.toLowerCase()),
-      fileType: fileType,
-      fileSizes: files.map(f => f.size)
-    });
-    
     const formData = new FormData();
-    files.forEach(file => {
-      formData.append('files', file);
-    });
+    files.forEach(file => formData.append('files', file));
     formData.append('file_type', fileType);
-    
-    // Add a timestamp to prevent caching
     formData.append('_t', Date.now().toString());
-    
-    // Для неавторизованной работы с файлами
-    const headers: Record<string, string> = {
-      // Не добавляем Content-Type, чтобы браузер сам сформировал с boundary
-    };
-    
-    // Получаем токен авторизации из localStorage
-    const storedToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-    
-    // Добавляем токен авторизации, если он есть
-    if (storedToken) {
-      headers['Authorization'] = `Bearer ${storedToken}`;
-    }
-    
-    // Прямой запрос без использования ApiClient для обхода проверки авторизации
-    const response = await fetch(`${API_URL}/chats/${chatId}/files`, {
+
+    // Use ApiClient.request which handles token and FormData
+    return await ApiClient.request(`/chats/${chatId}/files`, {
       method: 'POST',
-      headers,
       body: formData,
-      mode: 'cors'
     });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Server response error: ${response.status}`, errorText);
-      throw new Error(`Error uploading files: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    console.log("DEBUG: Files uploaded successfully", result);
-    return result;
   } catch (error) {
     console.error(`Error uploading files to chat ${chatId}:`, error);
     throw error;
   }
 }
 
-// Анализ файла с извлечением текста и векторным представлением
-export async function analyzeFile(file: File) {
+// Analyze file (check if authentication is needed)
+// Assuming /files/analyze requires authentication based on your backend
+export async function analyzeFile(file: File): Promise<{ file_id: number; text_content: string; [key: string]: any }> {
   try {
     const formData = new FormData();
     formData.append('file', file);
-    
-    console.log("DEBUG: Analyzing file:", {
-      fileName: file.name,
-      fileType: file.type,
-      fileExtension: file.name.split('.').pop()?.toLowerCase(),
-      fileSize: file.size
+    console.log("DEBUG: Analyzing file:", { fileName: file.name, fileSize: file.size });
+
+    // Use ApiClient.request which handles token and FormData
+    return await ApiClient.request('/files/analyze', {
+        method: 'POST',
+        body: formData
     });
-    
-    // Для неавторизованной работы с файлами
-    const headers: Record<string, string> = {
-      // Не добавляем Content-Type, чтобы браузер сам сформировал с boundary
-    };
-    
-    // Получаем токен авторизации из localStorage
-    const storedToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-    
-    // Добавляем токен авторизации, если он есть
-    if (storedToken) {
-      headers['Authorization'] = `Bearer ${storedToken}`;
-    }
-    
-    // Прямой запрос без использования ApiClient для обхода проверки авторизации
-    const response = await fetch(`${API_URL}/files/analyze`, {
-      method: 'POST',
-      headers,
-      body: formData,
-      mode: 'cors'
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Server response error: ${response.status}`, errorText);
-      throw new Error(`Error analyzing file: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    console.log("DEBUG: File analyzed successfully:", result);
-    return result;
   } catch (error) {
     console.error(`Error analyzing file:`, error);
     throw error;
   }
 }
 
-// Анализ нескольких файлов
-export async function analyzeMultipleFiles(files: File[]) {
+// Analyze multiple files (check if authentication is needed)
+// Assuming /files/bulk-analyze requires authentication
+export async function analyzeMultipleFiles(files: File[]): Promise<any[]> {
   try {
     const formData = new FormData();
-    files.forEach(file => {
-      formData.append('files', file);
+    files.forEach(file => formData.append('files', file));
+    console.log("DEBUG: Analyzing multiple files:", { fileCount: files.length });
+
+    // Use ApiClient.request which handles token and FormData
+    return await ApiClient.request('/files/bulk-analyze', {
+        method: 'POST',
+        body: formData
     });
-    
-    console.log("DEBUG: Analyzing files:", {
-      fileCount: files.length,
-      fileNames: files.map(f => f.name),
-      fileTypes: files.map(f => f.type),
-      fileExtensions: files.map(f => f.name.split('.').pop()?.toLowerCase()),
-      fileSizes: files.map(f => f.size)
-    });
-    
-    // Специальное исключение для доктора "Расшифровка" (ID 20)
-    // Для неавторизованной работы с файлами
-    const headers: Record<string, string> = {
-      // Не добавляем Content-Type, чтобы браузер сам сформировал с boundary
-    };
-    
-    // Получаем токен авторизации из localStorage
-    const storedToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-    
-    // Добавляем токен авторизации, если он есть
-    if (storedToken) {
-      headers['Authorization'] = `Bearer ${storedToken}`;
-    }
-    
-    // Прямой запрос без использования ApiClient для обхода проверки авторизации
-    const response = await fetch(`${API_URL}/files/bulk-analyze`, {
-      method: 'POST',
-      headers,
-      body: formData,
-      mode: 'cors'
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Server response error: ${response.status}`, errorText);
-      throw new Error(`Error analyzing files: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    console.log("DEBUG: Files analyzed successfully:", result);
-    return result;
   } catch (error) {
     console.error(`Error analyzing multiple files:`, error);
     throw error;
   }
 }
 
-// Очистка истории чата
+// Authenticated endpoint
 export async function clearChatHistory(chatId: number) {
   try {
     return await ApiClient.delete(`/chats/${chatId}`);
   } catch (error) {
-    console.error(`Error clearing chat history:`, error);
+    console.error(`Error clearing chat history for chat ${chatId}:`, error);
     throw error;
   }
 }
 
-// Экспорт чата в PDF
-export async function exportChatToPDF(chatContainer: HTMLElement, doctorName: string) {
-  return new Promise<void>((resolve, reject) => {
-    try {
-      html2canvas(chatContainer, {
-        scale: 1,
-        useCORS: true,
-        allowTaint: true,
-        scrollY: -window.scrollY
-      }).then(canvas => {
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF({
-          orientation: 'portrait',
-          unit: 'mm',
-          format: 'a4'
-        });
-        
-        const imgWidth = 210; // A4 width in mm
-        const pageHeight = 295; // A4 height in mm
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        let heightLeft = imgHeight;
-        let position = 0;
-        
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-        
-        // Add more pages if needed
-        while (heightLeft > 0) {
-          position = heightLeft - imgHeight;
-          pdf.addPage();
-          pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-          heightLeft -= pageHeight;
-        }
-        
-        // Add metadata
-        pdf.setProperties({
-          title: `Чат с ${doctorName}`,
-          subject: 'Медицинская консультация',
-          creator: 'ВопросДоктору',
-          author: 'ВопросДоктору'
-        });
-        
-        // Save the PDF
-        pdf.save(`Чат с ${doctorName}.pdf`);
-        resolve();
-      });
-    } catch (error) {
-      console.error('Error exporting chat to PDF:', error);
-      reject(error);
-    }
-  });
+// PDF Export (client-side, no API call needed)
+export async function exportChatToPDF(chatContainer: HTMLElement, doctorName: string): Promise<void> {
+   // Keep the existing implementation
+   return new Promise<void>((resolve, reject) => {
+     try {
+       html2canvas(chatContainer, {
+         scale: 1,
+         useCORS: true,
+         allowTaint: true,
+         scrollY: -window.scrollY
+       }).then(canvas => {
+         const imgData = canvas.toDataURL('image/png');
+         const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+         const imgWidth = 210; const pageHeight = 295;
+         const imgHeight = (canvas.height * imgWidth) / canvas.width;
+         let heightLeft = imgHeight; let position = 0;
+         pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+         heightLeft -= pageHeight;
+         while (heightLeft > 0) {
+           position = heightLeft - imgHeight;
+           pdf.addPage();
+           pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+           heightLeft -= pageHeight;
+         }
+         pdf.setProperties({ title: `Чат с ${doctorName}`, subject: 'Медицинская консультация', creator: 'Doctus', author: 'Doctus' });
+         pdf.save(`Чат с ${doctorName}.pdf`);
+         resolve();
+       }).catch(reject); // Catch html2canvas errors
+     } catch (error) {
+       console.error('Error exporting chat to PDF:', error);
+       reject(error);
+     }
+   });
 }
 
-// Семантический поиск по файлам
+
+// Authenticated endpoint
 export async function searchFiles(query: string, limit: number = 5) {
   try {
     return await ApiClient.get(`/files/search?query=${encodeURIComponent(query)}&limit=${limit}`);
@@ -860,7 +670,7 @@ export async function searchFiles(query: string, limit: number = 5) {
   }
 }
 
-// Семантический поиск в векторной БД
+// Authenticated endpoint
 export async function searchVectorDB(query: string, limit: number = 5) {
   try {
     return await ApiClient.get(`/files/vector-search?query=${encodeURIComponent(query)}&limit=${limit}`);
@@ -870,24 +680,15 @@ export async function searchVectorDB(query: string, limit: number = 5) {
   }
 }
 
-export interface PaymentCreate {
-  plan_id: number;
-  period_months: number;
-}
+// --- Payment Interfaces (keep as is) ---
+export interface PaymentCreate { plan_id: number; period_months: number; }
+export interface PaymentResponse { id: string; status: string; amount: number; currency: string; description: string; confirmation_url: string; created_at: string; db_payment_id: number; }
 
-export interface PaymentResponse {
-  id: string;
-  status: string;
-  amount: number;
-  currency: string;
-  description: string;
-  confirmation_url: string;
-  created_at: string;
-  db_payment_id: number;
-}
+// --- Payment Functions (using updated ApiClient) ---
 
+// Authenticated endpoint
 export async function createPayment(planId: number, periodMonths: number): Promise<PaymentResponse> {
-  return ApiClient.post('/payments/create', { 
+  return ApiClient.post('/payments/create', {
     plan_id: planId,
     period_months: periodMonths
   });
