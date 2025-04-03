@@ -5,6 +5,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 
 // Ensure backend URL is set
 const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend.doctus.chat';
+console.log('Using backend URL:', backendUrl); // Logging for debugging
 if (!backendUrl) {
   throw new Error('Environment variable NEXT_PUBLIC_API_URL or NEXT_AUTH_BACKEND_URL must be set');
 }
@@ -180,64 +181,114 @@ export const authOptions: NextAuthOptions = {
     strategy: 'jwt',
     // maxAge: 30 * 24 * 60 * 60, // Example: 30 days session
   },
+  // ADD EXPLICIT COOKIE CONFIGURATION
+  cookies: {
+    sessionToken: {
+      // Use __Secure- prefix in production for enhanced security
+      name: `${process.env.NODE_ENV === 'production' ? '__Secure-' : ''}next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax', // Consider 'strict' if applicable
+        path: '/',
+        // Ensure secure flag is true in production (HTTPS)
+        secure: process.env.NODE_ENV === 'production',
+        // domain: '.yourdomain.com' // Add your domain if needed, starting with a dot
+      },
+    },
+    // Add configurations for other cookies like callbackUrl and csrfToken if needed
+    // callbackUrl: { ... },
+    // csrfToken: { ... },
+  },
   callbacks: {
     async jwt({ token, user, account }): Promise<JWT> {
        // **Initial sign in**
        if (account && user) {
          const authorizeUser = user as any; // Use `as any` here
+         
+         // Debug logging to see what we're getting from authorizeUser
+         console.log('JWT callback - authorizeUser:', {
+           id: authorizeUser.id,
+           email: authorizeUser.email,
+           name: authorizeUser.name,
+           accessToken: !!authorizeUser.accessToken,
+           backendUser: authorizeUser.backendUser ? Object.keys(authorizeUser.backendUser) : null
+         });
+         
          token.accessToken = authorizeUser.accessToken;
          token.accessTokenExpires = authorizeUser.accessTokenExpires;
          token.sub = authorizeUser.id;
          token.iat = Math.floor(Date.now() / 1000);
          token.exp = Math.floor(authorizeUser.accessTokenExpires / 1000);
+         
+         // Ensure avatar is correctly stored from backendUser
+         const avatar = authorizeUser.backendUser?.avatar;
+         console.log('JWT callback - backendUser avatar:', avatar);
+         
          token.user = { // Populate user details in token
               id: authorizeUser.id,
-              email: authorizeUser.backendUser?.email,
+              email: authorizeUser.backendUser?.email || authorizeUser.email,
               name: authorizeUser.backendUser?.name || authorizeUser.backendUser?.full_name || null,
-              avatar: authorizeUser.backendUser?.avatar, // Add avatar here
+              avatar: avatar, // Directly use avatar from backendUser
               role: authorizeUser.backendUser?.role,
-          } as any; // Use `as any` for the custom user object
+          };
+          
+          console.log('JWT callback - token user set:', { 
+            id: token.user.id, 
+            email: token.user.email,
+            name: token.user.name,
+            avatar: token.user.avatar
+          });
+          
           return token;
        }
 
       // **Subsequent calls: Check expiry**
       if (token.accessTokenExpires && Date.now() < (token.accessTokenExpires as number)) {
+        // Log for debugging
+        console.log('JWT callback - Using existing valid token');
         return token; // Token still valid
       }
 
       // **Refresh token logic (if implemented)**
       // return refreshAccessToken(token);
       console.warn("JWT Callback: Token expired or invalid, refresh logic not implemented.");
-      return { ...token, error: "RefreshAccessTokenError" } as JWT; // Cast return
+      return { ...token, error: "RefreshAccessTokenError" };
     },
 
     async session({ session, token }): Promise<Session> {
-      // Copy required fields from token to session using type assertions
-      session.accessToken = token.accessToken as string | undefined;
-      session.error = token.error as string | undefined;
+      console.log('Session callback - token:', { 
+        sub: token.sub,
+        accessToken: !!token.accessToken,
+        user: token.user ? {
+          id: token.user.id,
+          email: token.user.email,
+          name: token.user.name,
+          avatar: token.user.avatar
+        } : null
+      });
+      
+      // Copy required fields from token to session
+      session.accessToken = token.accessToken;
+      session.error = token.error;
 
       // Construct session.user based on token data
-      const tokenUser = token.user as any; // Use `as any`
+      const tokenUser = token.user || {};
       session.user = {
-          ...(session.user), // Keep default fields like expires
+          ...(session.user || {}), // Keep default fields
           id: token.sub || '',
-          email: tokenUser?.email || '', 
-          name: tokenUser?.name,
-          avatar: tokenUser?.avatar,
-          role: tokenUser?.role,
-          // Cast the final object to Session['user'] to satisfy the type
-      } as Session['user'];
-
-      // Clean up potentially added backendUser from session.user if necessary
-      if (session.user && 'backendUser' in session.user) {
-        delete (session.user as any).backendUser;
-      }
-      if (session.user && 'accessToken' in session.user) {
-        delete (session.user as any).accessToken;
-      }
-       if (session.user && 'accessTokenExpires' in session.user) {
-        delete (session.user as any).accessTokenExpires;
-      }
+          email: tokenUser.email || '', 
+          name: tokenUser.name,
+          avatar: tokenUser.avatar,
+          role: tokenUser.role,
+      };
+      
+      // Log for debugging
+      console.log('Session callback - session user set:', { 
+        id: session.user.id, 
+        email: session.user.email,
+        name: session.user.name,
+        avatar: session.user.avatar
+      });
 
       return session;
     },

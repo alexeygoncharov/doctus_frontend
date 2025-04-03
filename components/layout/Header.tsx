@@ -87,17 +87,34 @@ const Header: React.FC = () => {
       signOut({ callbackUrl: '/auth/login' });
   };
 
+  // Детальная отладка для сессии и пользователя
+  console.log('==== ОТЛАДКА СЕССИИ И ПОЛЬЗОВАТЕЛЯ В ХЕДЕРЕ ====');
+  console.log('Session status:', status);
+  console.log('Session data:', session);
+  console.log('User from session:', user);
+  console.log('==== КОНЕЦ ОТЛАДКИ СЕССИИ В ХЕДЕРЕ ====');
+
   // Determine the avatar URL from session, localStorage or fallback
   // Use getBackendUrl to handle relative paths if necessary
-  const currentAvatarUrl = user?.avatar 
-    ? getBackendUrl(user.avatar) 
-    : localAvatarUrl 
-      ? getBackendUrl(localAvatarUrl)
-      : null;
+  const avatarFromUser = user?.avatar ? String(user.avatar) : null;
+  const avatarFromLocal = localAvatarUrl ? String(localAvatarUrl) : null;
+  
+  // Determine the avatar URL
+  let currentAvatarUrl = null;
+  
+  if (avatarFromUser) {
+    currentAvatarUrl = avatarFromUser.startsWith('http') 
+      ? avatarFromUser 
+      : getBackendUrl(avatarFromUser);
+  } else if (avatarFromLocal) {
+    currentAvatarUrl = avatarFromLocal.startsWith('http') 
+      ? avatarFromLocal 
+      : getBackendUrl(avatarFromLocal);
+  }
   
   console.log('==== ОТЛАДКА АВАТАР В ХЕДЕРЕ ====');
-  console.log('user?.avatar в хедере:', user?.avatar);
-  console.log('localAvatarUrl в хедере:', localAvatarUrl);
+  console.log('user?.avatar в хедере:', avatarFromUser);
+  console.log('localAvatarUrl в хедере:', avatarFromLocal);
   console.log('currentAvatarUrl в хедере:', currentAvatarUrl);
   console.log('==== КОНЕЦ ОТЛАДКИ АВАТАРА В ХЕДЕРЕ ====');
 
@@ -374,13 +391,25 @@ const Header: React.FC = () => {
                       className="object-cover size-full rounded-full"
                       width={48}
                       height={48}
-                      // Basic error handling for broken image links
-                      onError={(e) => { console.error('Avatar image load error:', e.currentTarget.src); e.currentTarget.style.display = 'none'; /* Hide broken image */ }}
+                      // Improved error handling for broken image links
+                      onError={(e) => { 
+                        console.error('Avatar image load error:', e.currentTarget.src); 
+                        // Показываем fallback вместо сломанного изображения
+                        e.currentTarget.style.display = 'none';
+                        // Создаем контейнер для инициалов
+                        const parent = e.currentTarget.parentElement;
+                        if (parent) {
+                          const fallback = document.createElement('div');
+                          fallback.className = "size-full bg-blue-100 flex items-center justify-center text-blue-500 rounded-full";
+                          fallback.textContent = user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U';
+                          parent.appendChild(fallback);
+                        }
+                      }}
                     />
                   ) : (
-                    // Fallback initials
+                    // Fallback initials with better text content handling
                     <div className="size-full bg-blue-100 flex items-center justify-center text-blue-500 rounded-full">
-                      {user?.name?.[0].toUpperCase() || user?.email?.[0].toUpperCase() || 'U'}
+                      {(user?.name?.[0] || user?.email?.[0] || 'U').toUpperCase()}
                     </div>
                   )}
                 </div>

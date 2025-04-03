@@ -1,13 +1,16 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth } from '@/lib/auth-context';
+import { useSession } from 'next-auth/react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+  // Используем напрямую useSession вместо useAuth для лучшей совместимости с Vercel
+  const { data: session, status } = useSession();
+  const isAuthenticated = status === 'authenticated';
+  const isLoading = status === 'loading';
   const router = useRouter();
 
   useEffect(() => {
@@ -15,12 +18,21 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
       return; // Ждем завершения загрузки
     }
     
-    if (!isAuthenticated) {
-      // Сохраняем текущий путь для редиректа после логина
-      const returnUrl = encodeURIComponent(router.asPath);
-      router.push(`/auth/login?returnUrl=${returnUrl}`);
+    // Проверяем наличие ошибки токена - это может вызывать бесконечную петлю
+    if (session?.error === 'RefreshAccessTokenError') {
+      console.error('Обнаружена ошибка токена в ProtectedRoute, выходим');
+      // Не используем редирект здесь, просто возвращаемся
+      return;
     }
-  }, [isAuthenticated, isLoading, router]);
+    
+    if (!isAuthenticated) {
+      console.log('ProtectedRoute: Пользователь не аутентифицирован, перенаправление на страницу входа');
+      // Простое перенаправление без параметров
+      router.push('/auth/login');
+    } else {
+      console.log('ProtectedRoute: Пользователь аутентифицирован, разрешаем доступ');
+    }
+  }, [isAuthenticated, isLoading, router, session]);
 
   // Показываем спиннер во время загрузки или если пользователь не авторизован (до редиректа)
   if (isLoading || !isAuthenticated) {

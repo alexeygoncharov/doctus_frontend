@@ -49,22 +49,36 @@ export const getBackendUrl = (path: string | null | undefined): string => {
   console.log('Input path:', path);
   console.log('SERVER_URL:', SERVER_URL);
   
+  // Handle empty/null value
   if (!path) {
     console.log('Path is null or undefined, returning empty string');
     console.log('==== КОНЕЦ ОТЛАДКИ getBackendUrl ====');
     return ''; 
   }
   
-  if (path.startsWith('http')) {
-    console.log('Path already starts with http, returning as is');
+  // Already a full URL
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    console.log('Path already starts with http/https, returning as is');
+    console.log('==== КОНЕЦ ОТЛАДКИ getBackendUrl ====');
+    return path;
+  }
+  
+  // Handle data URLs (for embedded images)
+  if (path.startsWith('data:')) {
+    console.log('Path is a data URL, returning as is');
     console.log('==== КОНЕЦ ОТЛАДКИ getBackendUrl ====');
     return path;
   }
 
-  // Ensure path starts with a slash if it's relative
-  const correctedPath = path.startsWith('/') ? path : `/${path}`;
+  // Handle relative path formats
+  let correctedPath = path;
   
-  // Add debug log to see what is happening with the URL construction
+  // Ensure path starts with a slash if it's relative
+  if (!path.startsWith('/')) {
+    correctedPath = `/${path}`;
+  }
+  
+  // Construct full URL
   const fullUrl = `${SERVER_URL}${correctedPath}`;
   console.log('Corrected path:', correctedPath);
   console.log('Full URL constructed:', fullUrl);

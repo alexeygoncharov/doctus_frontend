@@ -16,12 +16,14 @@ const LoginPage = () => {
   const { returnUrl, callbackUrl } = router.query;
 
   // Если пользователь уже авторизован, перенаправляем его
+  /*
   if (status === 'authenticated' && session?.user?.id) {
     console.log('Login page: User is authenticated, redirecting to', callbackUrl || returnUrl || '/');
     const redirectUrl = (callbackUrl || returnUrl || '/') as string;
     router.push(redirectUrl);
     return null;
   }
+  */
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

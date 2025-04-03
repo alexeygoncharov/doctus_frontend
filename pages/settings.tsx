@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { AvatarContext } from './_app';
 import { SubscriptionSection } from '../components/subscription/SubscriptionSection';
-import { useSession } from 'next-auth/react'; // Import useSession
+import { useSession, signOut } from 'next-auth/react'; // Import useSession and signOut
 // import { useAuth } from '../lib/auth-context'; // Remove old useAuth import
 import { 
   getUserProfile, 
@@ -67,6 +67,17 @@ const SettingsPage = () => {
   const [showPricingModal, setShowPricingModal] = useState(false);
   // selectedPeriod теперь управляется внутри компонента PricingModal
   
+  // Добавляем проверку, что токен действителен
+  useEffect(() => {
+    if (session?.error === 'RefreshAccessTokenError') {
+      // Если ошибка токена, выходим и редиректим на страницу логина
+      console.error('Обнаружена ошибка токена, выполняем выход');
+      // Используем импортированную функцию signOut напрямую, не из хука
+      // import { signOut } from 'next-auth/react';
+      signOut({ callbackUrl: '/auth/login' });
+    }
+  }, [session]);
+
   // Перенаправление на страницу входа теперь обрабатывается ProtectedRoute
 
   const tabs = [
@@ -133,6 +144,12 @@ const SettingsPage = () => {
   
   // Загружаем данные с сервера при загрузке компонента и когда сессия установлена
   useEffect(() => {
+    // Проверяем ошибку токена прежде всего
+    if (session?.error === 'RefreshAccessTokenError') {
+      console.error('Settings: Обнаружена ошибка токена, не загружаем профиль');
+      return;
+    }
+    
     // Выполняем только когда сессия загружена и пользователь аутентифицирован
     if (isAuthenticated && user?.id) {
       console.log('==== ОТЛАДКА СЕССИИ ====');
