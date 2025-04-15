@@ -1,3 +1,5 @@
+import { getBackendUrl } from "./api"; // Import the helper function
+
 export interface Doctor {
   id: number | string;
   name: string;
@@ -15,16 +17,43 @@ export interface Doctor {
 }
 
 export function mapApiDoctorToUi(doctor: any): Doctor {
-  const avatarUrl = doctor.avatar 
-    ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${doctor.avatar}`
-    : '/avatars/doctor-default.png';
-    
+  let avatarPath = '/avatars/doctor-default.png'; // Устанавливаем дефолтное значение сразу
+
+  // Проверяем сначала avatar_url, затем avatar
+  const potentialPaths = [doctor.avatar_url, doctor.avatar];
+  
+  for (const path of potentialPaths) {
+    if (path && typeof path === 'string') {
+       // Проверяем, является ли путь валидным относительным путем или локальным
+       if (path.startsWith('/uploads/') || path.startsWith('/avatars/') || path.startsWith('/img/')) {
+         avatarPath = path;
+         break; // Нашли валидный путь, выходим из цикла
+       } else if (path.startsWith('http')) {
+         try {
+           const url = new URL(path);
+           if (url.pathname.startsWith('/uploads/')) {
+              avatarPath = url.pathname;
+              break;
+           }
+         } catch (e) { /* Игнорируем ошибки парсинга URL */ }
+       } else {
+         // Логируем неожиданный формат, но продолжаем поиск в potentialPaths
+         // console.warn(`Doctor ${doctor.id}: Unexpected avatar path format: ${path}`);
+       }
+    }
+  }
+
+  // Если после проверки обоих полей avatarPath все еще дефолтный, значит, валидного пути не найдено.
+  // if (avatarPath === '/avatars/doctor-default.png' && (doctor.avatar_url || doctor.avatar)) {
+  //     console.warn(`Doctor ${doctor.id}: Neither avatar_url ('${doctor.avatar_url}') nor avatar ('${doctor.avatar}') provided a valid relative path. Using default.`);
+  // }
+
   return {
     id: doctor.id,
     name: doctor.name,
     specialty: doctor.specialty,
     description: doctor.description,
-    avatar: avatarUrl,
+    avatar: avatarPath, // Сохраняем найденный относительный путь (или дефолтный)
     isPremium: doctor.is_premium,
     is_premium: doctor.is_premium,
     modelId: doctor.model_id,

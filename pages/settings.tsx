@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import React, { useState, useEffect, useRef, useContext } from 'react';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, User } from 'lucide-react';
 import { PricingModal } from '../components/pricing/pricing-modal';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
@@ -46,7 +46,6 @@ const SettingsPage = () => {
       const storedAvatar = localStorage.getItem('userAvatar');
       if (storedAvatar) {
         setLocalAvatarUrl(storedAvatar);
-        console.log('Аватар загружен из localStorage на странице настроек:', storedAvatar);
       }
     }
   }, []);
@@ -71,7 +70,6 @@ const SettingsPage = () => {
   useEffect(() => {
     if (session?.error === 'RefreshAccessTokenError') {
       // Если ошибка токена, выходим и редиректим на страницу логина
-      console.error('Обнаружена ошибка токена, выполняем выход');
       // Используем импортированную функцию signOut напрямую, не из хука
       // import { signOut } from 'next-auth/react';
       signOut({ callbackUrl: '/auth/login' });
@@ -146,17 +144,11 @@ const SettingsPage = () => {
   useEffect(() => {
     // Проверяем ошибку токена прежде всего
     if (session?.error === 'RefreshAccessTokenError') {
-      console.error('Settings: Обнаружена ошибка токена, не загружаем профиль');
       return;
     }
     
     // Выполняем только когда сессия загружена и пользователь аутентифицирован
     if (isAuthenticated && user?.id) {
-      console.log('==== ОТЛАДКА СЕССИИ ====');
-      console.log('Session user object on load:', JSON.stringify(session?.user, null, 2));
-      console.log('session.user.avatar:', session?.user?.avatar);
-      console.log('======== КОНЕЦ ========');
-      console.log('Session authenticated, fetching user profile and subscription...');
       fetchUserProfile(user.id);
       fetchSubscriptionData();
     } else if (!isLoadingSession && !isAuthenticated) {
@@ -534,11 +526,6 @@ const SettingsPage = () => {
   // Добавляем эффект для логирования аватарки при рендере
   useEffect(() => {
     if (user?.avatar || avatarFile || localAvatarUrl) {
-      console.log('==== ОТЛАДКА АВАТАРКИ В НАСТРОЙКАХ ====');
-      console.log('Рендер аватарки. user?.avatar:', user?.avatar);
-      console.log('Рендер аватарки. localAvatarUrl:', localAvatarUrl);
-      console.log('Рендер аватарки. avatarFile:', avatarFile ? 'present' : 'null');
-      
       const avatarSource = avatarFile 
         ? URL.createObjectURL(avatarFile) 
         : (user?.avatar 
@@ -550,9 +537,6 @@ const SettingsPage = () => {
                   ? localAvatarUrl
                   : getBackendUrl(localAvatarUrl))
               : '');
-      
-      console.log('Рендер аватарки. Итоговый URL для отображения:', avatarSource);
-      console.log('==== КОНЕЦ ОТЛАДКИ АВАТАРКИ В НАСТРОЙКАХ ====');
     }
   }, [user?.avatar, avatarFile, localAvatarUrl]);
 

@@ -58,19 +58,15 @@ const AvatarImage = React.forwardRef<
       ref={ref} // Forward the ref
       onError={() => {
         // console.log(`AvatarImage: Error loading ${src}, showing fallback.`);
-        setHasError(true); // Set error state to true to hide the image and let fallback show
+        setHasError(true); // Устанавливаем ошибку ТОЛЬКО здесь
       }}
-      // Reset error state if loading completes successfully
-      // Note: onLoadingComplete might still be called on error in some Next.js versions
+      // Сбрасываем ошибку, если загрузка завершилась УСПЕШНО
+      // (onLoadingComplete вызывается и при ошибках в некоторых версиях)
       onLoadingComplete={(result) => {
-        // Check if the image actually loaded (naturalWidth > 0)
-        if (result.naturalWidth > 0) {
-           setHasError(false); // Reset error state only on successful load
-        } else {
-           // If naturalWidth is 0, it likely means an error occurred
-           // console.log(`AvatarImage: Loading complete but naturalWidth is 0 for ${src}.`);
-           setHasError(true);
-        }
+         // Просто сбрасываем ошибку, если загрузка завершилась. 
+         // Полагаемся на onError для установки реальных ошибок.
+         // Можно добавить проверку result.naturalWidth > 0, если нужно быть увереннее.
+         setHasError(false); 
       }}
       {...props} // Pass remaining props like `priority`, etc.
     />
@@ -94,5 +90,4 @@ const AvatarFallback = React.forwardRef<
 ))
 AvatarFallback.displayName = AvatarPrimitive.Fallback.displayName
 
-export { Avatar, AvatarFallback, AvatarImage }
-
+export { Avatar, AvatarFallback, AvatarImage } 

@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { openDB, type IDBPDatabase } from 'idb'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -40,70 +41,99 @@ export function formatDate(dateString: string): string {
 }
 
 /**
- * Кэширует изображение в localStorage для обеспечения персистентности
- * @param imageUrl URL изображения для кэширования
- * @returns Промис с base64-представлением изображения или null в случае ошибки
+ * Конвертирует HEIC изображение в JPEG
  */
-export async function cacheImageData(imageUrl: string): Promise<string | null> {
-  if (typeof window === 'undefined') return null; // SSR check
-  
+async function convertHeicToJpeg(blob: Blob): Promise<Blob> {
+  // Динамический импорт heic2any
+  const heic2any = (await import('heic2any')).default;
   try {
-    // Проверяем, есть ли уже в кэше
-    const cacheKey = `image_cache:${imageUrl}`;
-    const cachedData = localStorage.getItem(cacheKey);
-    
-    if (cachedData) {
-      return cachedData;
-    }
-    
-    // Если нет в кэше, загружаем и кэшируем
-    // Сначала пробуем через API прокси
-    let fetchUrl = imageUrl;
-    if (imageUrl.startsWith('/uploads/')) {
-      fetchUrl = `/api${imageUrl}`;
-    }
-    
-    const response = await fetch(fetchUrl);
-    if (!response.ok) {
-      console.error(`Не удалось загрузить изображение для кэширования: ${imageUrl}`);
-      return null;
-    }
-    
-    const blob = await response.blob();
-    
-    // Конвертируем blob в base64
-    return new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64data = reader.result as string;
-        // Сохраняем в localStorage с проверкой размера (лимит localStorage ~5MB)
-        try {
-          if (base64data.length < 4 * 1024 * 1024) { // Лимит ~4MB
-            localStorage.setItem(cacheKey, base64data);
-          }
-          resolve(base64data);
-        } catch (e) {
-          console.warn('Не удалось кэшировать изображение в localStorage, возможно, из-за ограничений размера');
-          resolve(base64data); // Всё равно возвращаем данные, даже если не можем кэшировать
-        }
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
+    const convertedBlob = await heic2any({
+      blob,
+      toType: "image/jpeg",
+      quality: 0.8
     });
+    return convertedBlob as Blob;
   } catch (error) {
-    console.error('Ошибка кэширования изображения:', error);
+    console.error('Ошибка конвертации HEIC в JPEG:', error);
+    throw error;
+  }
+}
+
+/**
+ * Сохраняет данные в IndexedDB (используя idb)
+ */
+export async function saveToIndexedDB(storeName: string, key: string, value: string): Promise<void> {
+  if (typeof window === 'undefined') return; // SSR check
+  
+  // Используем УНИФИЦИРОВАННОЕ имя базы данных 'imageCache'
+  const db = await openDB('imageCache', 1, {
+    upgrade(db: IDBPDatabase) {
+      // Создаем хранилище, только если оно еще не существует
+      if (!db.objectStoreNames.contains(storeName)) {
+        db.createObjectStore(storeName);
+      }
+    },
+  });
+
+  await db.put(storeName, value, key);
+}
+
+/**
+ * Получает кэшированные данные изображения из IndexedDB (переписано с использованием idb)
+ */
+export async function getCachedImageData(imageUrl: string): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    // Используем УНИФИЦИРОВАННОЕ имя базы данных 'imageCache' и то же имя хранилища 'images'
+    const db = await openDB('imageCache', 1, {
+      upgrade(db: IDBPDatabase) {
+        // Убедимся, что хранилище создается при необходимости
+        if (!db.objectStoreNames.contains('images')) {
+          db.createObjectStore('images');
+        }
+      },
+    });
+
+    // Получаем данные из хранилища 'images'
+    const cachedData = await db.get('images', imageUrl); // Используем imageUrl как ключ
+    
+    return cachedData || null;
+
+  } catch (error) {
+    console.error('Ошибка при получении данных из IndexedDB:', error);
     return null;
   }
 }
 
 /**
- * Получает кэшированные данные изображения из localStorage
- * @param imageUrl URL изображения для поиска в кэше
- * @returns Base64-представление изображения или null, если не найдено
+ * Кэширует изображение в IndexedDB (используя idb)
  */
-export function getCachedImageData(imageUrl: string): string | null {
-  if (typeof window === 'undefined') return null; // SSR check
+export async function cacheImageData(url: string, blob: Blob): Promise<string> {
+  if (typeof window === 'undefined') return URL.createObjectURL(blob); // SSR guard
   
-  const cacheKey = `image_cache:${imageUrl}`;
-  return localStorage.getItem(cacheKey);
+  try {
+    // Используем ArrayBuffer для более надежного хранения
+    const buffer = await blob.arrayBuffer();
+    
+    const db = await openDB('imageCache', 1, {
+      upgrade(db: IDBPDatabase) {
+        if (!db.objectStoreNames.contains('images')) {
+          db.createObjectStore('images');
+        }
+      },
+    });
+    
+    // Сохраняем ArrayBuffer в хранилище 'images'
+    await db.put('images', buffer, url); // Используем url как ключ
+    
+    // Создаем Object URL из оригинального blob для немедленного использования
+    const objectURL = URL.createObjectURL(blob); 
+    return objectURL;
+
+  } catch (error) {
+    console.error('Ошибка при кэшировании изображения в IndexedDB:', error);
+    // Возвращаем прямой URL даже если кэширование не удалось
+    return URL.createObjectURL(blob); 
+  }
 }

@@ -2,7 +2,14 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
+    domains: ['backend.doctus.chat', 'localhost', 'wownice.org'],
     remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '3000',
+        pathname: '/uploads/**',
+      },
       {
         protocol: 'http',
         hostname: 'localhost',
@@ -18,6 +25,11 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'backend.doctus.chat',
         pathname: '/uploads/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'backend.doctus.chat',
+        pathname: '/avatars/**',
       },
     ],
   },

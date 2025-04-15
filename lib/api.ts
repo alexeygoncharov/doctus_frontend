@@ -44,16 +44,24 @@ const BROWSER_API_URL = API_URL;
 const SERVER_URL = API_URL;
 
 // Helper to get full URL for backend resources
-export const getBackendUrl = (path: string | null | undefined): string => {
+export function getBackendUrl(path: string | null | undefined): string {
   console.log('==== ОТЛАДКА getBackendUrl ====');
   console.log('Input path:', path);
-  console.log('SERVER_URL:', SERVER_URL);
   
+  const SERVER_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend.doctus.chat';
+
   // Handle empty/null value
   if (!path) {
     console.log('Path is null or undefined, returning empty string');
     console.log('==== КОНЕЦ ОТЛАДКИ getBackendUrl ====');
     return ''; 
+  }
+  
+  // Already a full URL but points to localhost
+  if (path.startsWith('http://localhost')) {
+    const relativePath = path.includes('/uploads/') ? path.split('/uploads/')[1] : path;
+    console.log('Converting localhost path to backend path:', `${SERVER_URL}/uploads/${relativePath}`);
+    return path.includes('/uploads/') ? `${SERVER_URL}/uploads/${relativePath}` : path;
   }
   
   // Already a full URL
@@ -66,6 +74,13 @@ export const getBackendUrl = (path: string | null | undefined): string => {
   // Handle data URLs (for embedded images)
   if (path.startsWith('data:')) {
     console.log('Path is a data URL, returning as is');
+    console.log('==== КОНЕЦ ОТЛАДКИ getBackendUrl ====');
+    return path;
+  }
+
+  // Если путь начинается с /avatars/, то это локальное изображение из папки public
+  if (path.startsWith('/avatars/')) {
+    console.log('Path is a local avatar, returning as is');
     console.log('==== КОНЕЦ ОТЛАДКИ getBackendUrl ====');
     return path;
   }
@@ -85,7 +100,7 @@ export const getBackendUrl = (path: string | null | undefined): string => {
   console.log('==== КОНЕЦ ОТЛАДКИ getBackendUrl ====');
   
   return fullUrl;
-};
+}
 
 
 // Класс для работы с API
@@ -138,54 +153,58 @@ export class ApiClient {
 
   // Central request method
   static async request(url: string, options: RequestInit = {}) {
-    // Get token using NextAuth's getSession
-    const token = await this.getAuthToken();
-
-    const headers: Record<string, string> = {
-      ...(options.headers as Record<string, string>),
-    };
-
-    // Add Authorization header if token exists
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    // Set default Content-Type if not FormData
-    if (!(options.body instanceof FormData) && !headers['Content-Type']) {
-       headers['Content-Type'] = 'application/json';
-    }
-
-    // Remove Content-Type if it's FormData (browser sets it with boundary)
-    if (options.body instanceof FormData) {
-      delete headers['Content-Type'];
-    }
-
-    const isFullUrl = url.startsWith('http://') || url.startsWith('https://');
-    const apiUrlToUse = isFullUrl ? url : `${BROWSER_API_URL}${url}`;
-
     try {
-      console.log(`Making API request to: ${apiUrlToUse}`);
-      // console.log("With headers:", headers); // Optional: Log headers for debugging
+      const token = await this.getAuthToken();
+      
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
 
-      const response = await fetch(apiUrlToUse, {
+      const response = await fetch(`${API_URL}${url}`, {
         ...options,
-        headers,
-        mode: 'cors', // Ensure CORS is enabled
+        headers: {
+          ...options.headers,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
       });
 
       if (!response.ok) {
-         let errorBody: any = null;
-         try {
-             errorBody = await response.json();
-             console.error('API Error Body:', errorBody);
-         } catch (e) {
-             // If response is not JSON, read as text
-             const errorText = await response.text();
-             console.error('API Error Text:', errorText);
-             errorBody = { detail: errorText || `Request failed with status ${response.status}` };
-         }
+        let errorBody;
+        try {
+          errorBody = await response.json();
+        } catch (e) {
+          const errorText = await response.text();
+          errorBody = { detail: errorText || `Request failed with status ${response.status}` };
+        }
 
-        // Extract detailed error message
+        if (response.status === 401) {
+          // Попытка обновить токен через next-auth
+          const session = await fetch('/api/auth/session');
+          if (!session.ok) {
+            throw new Error('Session expired. Please login again.');
+          }
+          
+          // Повторяем запрос с новым токеном
+          const newToken = await this.getAuthToken();
+          if (newToken) {
+            const retryResponse = await fetch(`${API_URL}${url}`, {
+              ...options,
+              headers: {
+                ...options.headers,
+                'Authorization': `Bearer ${newToken}`,
+                'Content-Type': 'application/json',
+              },
+            });
+            
+            if (retryResponse.ok) {
+              return retryResponse.json();
+            }
+          }
+          
+          throw new Error('Not authenticated');
+        }
+
         let errorMessage = 'API Request Failed';
         if (errorBody && errorBody.detail) {
           if (Array.isArray(errorBody.detail)) {
@@ -194,16 +213,7 @@ export class ApiClient {
             errorMessage = errorBody.detail;
           }
         } else {
-            errorMessage = `HTTP error ${response.status}`;
-        }
-
-        // Special handling for 401 Unauthorized
-        if (response.status === 401) {
-            console.warn("API request unauthorized (401). Token might be invalid or expired.");
-            errorMessage = "Not authenticated"; // Consistent error message
-            // Optionally trigger sign-out or refresh token logic here if needed globally
-            // import { signOut } from 'next-auth/react';
-            // signOut();
+          errorMessage = `HTTP error ${response.status}`;
         }
 
         throw new Error(errorMessage);
@@ -342,18 +352,63 @@ export async function getStrapiPlans(): Promise<StrapiPlansResponse> {
 // Authenticated endpoint
 export async function getCurrentSubscription(): Promise<SubscriptionResponse | null> { // Allow null return
   try {
-      return await ApiClient.get('/subscriptions/current');
-  } catch (error) {
-      if (error instanceof Error && error.message === 'Not authenticated') {
-          console.log('No active session or subscription not found (401).');
-          return null; // Return null instead of throwing for 401
-      }
-      if (error instanceof Error && error.message.includes('404')) { // Handle 404 if backend returns that for no subscription
-          console.log('No active subscription found (404).');
+    // Use fetch directly to handle specific non-OK responses gracefully
+    const token = await ApiClient.getAuthToken();
+    if (!token) {
+      console.log('No auth token available for fetching subscription.');
+      return null; // Not authenticated, no subscription
+    }
+
+    const response = await fetch(`${API_URL}/subscriptions/current`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+    });
+
+    if (response.ok) {
+      return await response.json(); // Subscription found
+    }
+
+    // Handle non-OK responses
+    if (response.status === 401) {
+        console.log('Not authenticated when fetching subscription (401).');
+        // Optionally trigger sign out here if needed
+        // await signOut({ callbackUrl: '/auth/login' });
+        return null;
+    }
+
+    if (response.status === 404) {
+        console.log('No active subscription found (404).');
+        return null;
+    }
+
+    // Try to read error message for other non-OK statuses
+    try {
+      const errorBody = await response.json();
+      const errorMsg = (errorBody?.detail || '').toLowerCase();
+      if (errorMsg.includes('not found') || errorMsg.includes('не найдена')) {
+          console.log('No active subscription found (specific message).');
           return null;
       }
-      console.error('Error fetching current subscription:', error);
-      throw error; // Re-throw other errors
+      // Throw error if it's not a recognized "not found" message
+      throw new Error(errorBody?.detail || `Subscription fetch failed with status ${response.status}`);
+    } catch (parseError) {
+       // If reading JSON fails, throw a generic error
+       throw new Error(`Subscription fetch failed with status ${response.status}`);
+    }
+
+  } catch (error) {
+    // Log and re-throw any other unexpected errors caught during direct fetch/processing
+    console.error('Error fetching current subscription:', error);
+    // Avoid throwing the specific "не найдена" error if it bubbles up somehow
+    if (error instanceof Error && (error.message.toLowerCase().includes('not found') || error.message.toLowerCase().includes('не найдена'))) {
+         console.log('Caught subscription not found error at the end.');
+         return null;
+    }
+    throw error; // Re-throw other errors
   }
 }
 
@@ -541,12 +596,17 @@ export async function getUserChats() {
 // Authenticated endpoint
 export async function getChatMessages(chatId: number, skip: number = 0, limit: number = 100) {
   try {
-    return await ApiClient.get(`/chats/${chatId}/messages?skip=${skip}&limit=${limit}`);
+    const messages = await ApiClient.get(`/chats/${chatId}/messages?skip=${skip}&limit=${limit}`);
+    // Преобразуем timestamp в объект Date для каждого сообщения
+    return messages.map((message: any) => ({
+      ...message,
+      timestamp: new Date(message.timestamp)
+    }));
   } catch (error) {
-       if (error instanceof Error && error.message === 'Not authenticated') {
-          console.log(`Cannot fetch messages for chat ${chatId}: User not authenticated.`);
-          return []; // Return empty array if not authenticated
-      }
+    if (error instanceof Error && error.message === 'Not authenticated') {
+      console.log(`Cannot fetch messages for chat ${chatId}: User not authenticated.`);
+      return []; // Return empty array if not authenticated
+    }
     console.error(`Error fetching messages for chat ${chatId}:`, error);
     return [];
   }

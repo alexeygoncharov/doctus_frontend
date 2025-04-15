@@ -2,13 +2,13 @@
 
 import React, { useState, useEffect } from "react";
 import { Doctor, doctors as staticDoctors, mapApiDoctorToUi } from "../../lib/doctors";
-import { getDoctors } from "../../lib/api";
+import { getDoctors, getChatMessages, getUserChats } from "../../lib/api";
 import { Message } from "../../lib/types";
 import { DoctorList } from "../../components/doctors/doctor-list";
 import { ChatWindow } from "../../components/chat/chat-window";
 import { MenuIcon, User } from "lucide-react";
-import { Avatar, AvatarImage, AvatarFallback } from "../../components/ui/avatar";
 import { PricingModal } from "../../components/pricing/pricing-modal";
+import { useAuth } from "@/lib/auth-context";
 
 interface DoctorChatProps {
   initialDoctorId?: string | number;
@@ -21,6 +21,9 @@ export function DoctorChat({ initialDoctorId }: DoctorChatProps = {}) {
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyAttempted, setHistoryAttempted] = useState<Record<string, boolean>>({});
+  const { token } = useAuth();
   
   // Загрузка докторов из API
   useEffect(() => {
@@ -73,6 +76,72 @@ export function DoctorChat({ initialDoctorId }: DoctorChatProps = {}) {
     });
     setChatSessions(initialSessions);
   }, [doctors]);
+  
+  // Загрузка истории чата при выборе доктора
+  useEffect(() => {
+    // Import getUserChats at the top of the file if not already done:
+    // import { ..., getUserChats } from "../../lib/api"; 
+
+    if (selectedDoctor && token && !historyAttempted[selectedDoctor.id]) {
+      const findAndFetchChatHistory = async () => {
+        console.log(`Attempting to find/fetch chat history for doctor ${selectedDoctor.id}`);
+        setIsLoadingHistory(true);
+        // Mark as attempted *before* the async operation starts
+        setHistoryAttempted(prev => ({ ...prev, [selectedDoctor.id]: true }));
+  
+        try {
+          // 1. Fetch all user chats
+          const userChats = await getUserChats(); // Fetch user chats
+          console.log(`User chats fetched:`, userChats);
+  
+          // 2. Find the chat for the selected doctor
+          const relevantChat = userChats.find((chat: any) => chat.doctor_id.toString() === selectedDoctor.id.toString());
+  
+          if (relevantChat) {
+            console.log(`Found existing chat with ID ${relevantChat.id} for doctor ${selectedDoctor.id}`);
+            // 3. Fetch history using the found chatId
+            const history = await getChatMessages(relevantChat.id); // Use relevantChat.id
+            console.log(`Fetched history for chat ${relevantChat.id}:`, history);
+  
+            if (Array.isArray(history)) {
+              setChatSessions(prev => ({
+                ...prev,
+                [selectedDoctor.id]: history
+              }));
+            } else {
+              console.warn("getChatMessages did not return an array for chat:", relevantChat.id, history);
+              setChatSessions(prev => ({
+                ...prev,
+                [selectedDoctor.id]: [] // Reset to empty if data is invalid
+              }));
+            }
+          } else {
+            console.log(`No existing chat found for doctor ${selectedDoctor.id}. Displaying empty chat.`);
+            // Ensure the chat session is empty if no chat exists
+             setChatSessions(prev => ({
+               ...prev,
+               [selectedDoctor.id]: []
+             }));
+          }
+        } catch (error) {
+          console.error(`Error finding or fetching chat history for doctor ${selectedDoctor.id}:`, error);
+           // Ensure the chat session is empty on error
+           setChatSessions(prev => ({
+             ...prev,
+             [selectedDoctor.id]: []
+           }));
+        } finally {
+          setIsLoadingHistory(false);
+        }
+      };
+  
+      findAndFetchChatHistory();
+    } else if (selectedDoctor && !historyAttempted[selectedDoctor.id]) {
+       // If no token, or already attempted, ensure chat is empty and mark attempted
+       setChatSessions(prev => ({ ...prev, [selectedDoctor.id]: [] }));
+       setHistoryAttempted(prev => ({ ...prev, [selectedDoctor.id]: true }));
+    }
+  }, [selectedDoctor, token, historyAttempted]); // Dependencies remain the same
   
   // Event listener for showing pricing modal
   useEffect(() => {
@@ -127,6 +196,9 @@ export function DoctorChat({ initialDoctorId }: DoctorChatProps = {}) {
           onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
           onSelectDoctor={handleSelectDoctor}
           selectedDoctorId={selectedDoctor?.id || null}
+          doctors={doctors}
+          isLoading={isLoading}
+          error={null}
         />
       </div>
       
@@ -150,11 +222,17 @@ export function DoctorChat({ initialDoctorId }: DoctorChatProps = {}) {
         </div>
         
         <div className="flex-1 overflow-auto">
-          <ChatWindow 
-            doctor={selectedDoctor}
-            messages={currentMessages}
-            setMessages={setCurrentMessages}
-          />
+          {isLoadingHistory ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          ) : (
+            <ChatWindow 
+              doctor={selectedDoctor}
+              messages={currentMessages}
+              setMessages={setCurrentMessages}
+            />
+          )}
         </div>
       </div>
       

@@ -6,15 +6,23 @@ import { AvatarContext } from '@/pages/_app'; // Keep if used for UI interaction
 import { getBackendUrl } from '@/lib/api'; // Keep if used elsewhere
 import { getDoctors } from '@/lib/api';
 import { Doctor, mapApiDoctorToUi } from '@/lib/doctors';
-// import { useAuth } from '@/lib/auth-context'; // Use useSession instead for auth state
+import { useAuth } from '@/lib/auth-context';
 import { useSession, signOut } from 'next-auth/react'; // Import useSession and signOut
+import { Button } from "@/components/ui/button";
+// import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"; // Закомментируем временно
+// import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"; // <-- Комментируем и эту строку
+import { Input } from "@/components/ui/input";
+import { SimpleAvatar } from "@/components/ui/SimpleAvatar";
+import { User as UserIcon } from 'lucide-react';
+import { PricingModal } from '@/components/pricing/pricing-modal';
+import { SearchIcon } from "lucide-react";
 
 const Header: React.FC = () => {
   const router = useRouter();
-  const { data: session, status } = useSession(); // Get session data and status
+  const { data: session, status } = useSession();
   const isLoading = status === 'loading';
   const isLoggedIn = status === 'authenticated';
-  const user = session?.user; // User object from session
+  const user = session?.user;
 
   // State for UI elements
   const [isSticky, setIsSticky] = useState(false);
@@ -28,7 +36,7 @@ const Header: React.FC = () => {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const storedAvatar = localStorage.getItem('userAvatar');
-      if (storedAvatar) {
+      if (storedAvatar && !user?.avatar) {
         setLocalAvatarUrl(storedAvatar);
       }
     }
@@ -38,6 +46,7 @@ const Header: React.FC = () => {
   useEffect(() => {
     if (user?.avatar) {
       setLocalAvatarUrl(user.avatar);
+      localStorage.setItem('userAvatar', user.avatar);
     }
   }, [user?.avatar]);
 
@@ -87,13 +96,6 @@ const Header: React.FC = () => {
       signOut({ callbackUrl: '/auth/login' });
   };
 
-  // Детальная отладка для сессии и пользователя
-  console.log('==== ОТЛАДКА СЕССИИ И ПОЛЬЗОВАТЕЛЯ В ХЕДЕРЕ ====');
-  console.log('Session status:', status);
-  console.log('Session data:', session);
-  console.log('User from session:', user);
-  console.log('==== КОНЕЦ ОТЛАДКИ СЕССИИ В ХЕДЕРЕ ====');
-
   // Determine the avatar URL from session, localStorage or fallback
   // Use getBackendUrl to handle relative paths if necessary
   const avatarFromUser = user?.avatar ? String(user.avatar) : null;
@@ -112,11 +114,11 @@ const Header: React.FC = () => {
       : getBackendUrl(avatarFromLocal);
   }
   
-  console.log('==== ОТЛАДКА АВАТАР В ХЕДЕРЕ ====');
-  console.log('user?.avatar в хедере:', avatarFromUser);
-  console.log('localAvatarUrl в хедере:', avatarFromLocal);
-  console.log('currentAvatarUrl в хедере:', currentAvatarUrl);
-  console.log('==== КОНЕЦ ОТЛАДКИ АВАТАРА В ХЕДЕРЕ ====');
+  // console.log('==== ОТЛАДКА АВАТАР В ХЕДЕРЕ ====');
+  // console.log('user?.avatar в хедере:', avatarFromUser);
+  // console.log('localAvatarUrl в хедере:', avatarFromLocal);
+  // console.log('currentAvatarUrl в хедере:', currentAvatarUrl);
+  // console.log('==== КОНЕЦ ОТЛАДКИ АВАТАРА В ХЕДЕРЕ ====');
 
   return (
     <header className={`bg-white px-4 ${isSticky ? 'sticky top-0 z-50 shadow-md transition-all' : ''}`}>
@@ -270,19 +272,19 @@ const Header: React.FC = () => {
               <div className="hidden lg:flex h-[50px] w-[200px]"></div>
           )}
 
-          {/* Hamburger Menu Button (Mobile) */}
+          {/* Hamburger Menu Button (Mobile) - Requires Sheet component
           <button
             className="lg:hidden flex items-center justify-center ml-auto"
             onClick={toggleMobileMenu}
             aria-label="Меню"
           >
-             {/* SVG Hamburger Icon */}
              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                <line x1="4" y1="12" x2="20" y2="12"></line>
                <line x1="4" y1="6" x2="20" y2="6"></line>
                <line x1="4" y1="18" x2="20" y2="18"></line>
              </svg>
           </button>
+          */}
 
           {/* Mobile Menu Panel */}
           {isMobileMenuOpen && (
@@ -383,34 +385,23 @@ const Header: React.FC = () => {
           {!isLoading && isLoggedIn && (
             <div className="group/profile flex items-center gap-2 bg-blue-50 sm:bg-white pr-3 sm:pr-0 rounded-2xl sm:rounded-none relative">
               <Link href="/settings" className="flex items-center gap-2">
-                <div className="size-8.5 min-w-8.5 sm:size-12 sm:min-w-12 rounded-full overflow-hidden">
+                <div className="relative w-10 h-10 rounded-full overflow-hidden">
                   {currentAvatarUrl ? (
-                    <Image
+                    <Image 
+                      alt="Аватар пользователя" 
                       src={currentAvatarUrl}
-                      alt={user?.name || 'Пользователь'}
-                      className="object-cover size-full rounded-full"
-                      width={48}
-                      height={48}
-                      // Improved error handling for broken image links
-                      onError={(e) => { 
-                        console.error('Avatar image load error:', e.currentTarget.src); 
-                        // Показываем fallback вместо сломанного изображения
-                        e.currentTarget.style.display = 'none';
-                        // Создаем контейнер для инициалов
-                        const parent = e.currentTarget.parentElement;
-                        if (parent) {
-                          const fallback = document.createElement('div');
-                          fallback.className = "size-full bg-blue-100 flex items-center justify-center text-blue-500 rounded-full";
-                          fallback.textContent = user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U';
-                          parent.appendChild(fallback);
-                        }
-                      }}
+                      layout="fill"
+                      objectFit="cover"
+                      className="hover:opacity-90 transition-opacity"
                     />
                   ) : (
-                    // Fallback initials with better text content handling
-                    <div className="size-full bg-blue-100 flex items-center justify-center text-blue-500 rounded-full">
-                      {(user?.name?.[0] || user?.email?.[0] || 'U').toUpperCase()}
-                    </div>
+                    <SimpleAvatar 
+                      src={user?.avatar ?? undefined}
+                      alt={user?.name ?? user?.email ?? "User"}
+                      fallbackText={user?.name ?? user?.email ?? undefined}
+                      width={32}
+                      height={32}
+                    />
                   )}
                 </div>
                 <div className="hidden sm:flex flex-col gap-0.25">
@@ -436,7 +427,7 @@ const Header: React.FC = () => {
                        Профиль
                     </Link>
                   </li>
-                   {/* Premium Link */}
+                   {/* Premium Link - Consider using usePricingModal hook here if needed */}
                   <li className="px-1 border-b border-solid border-slate-200/60">
                     <Link href="/plans" className="flex items-center w-48 group transition text-slate-600 hover:text-blue-500 text-sm py-1.5 px-2 gap-x-2">
                        {/* SVG Premium Icon */}

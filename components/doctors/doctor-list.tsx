@@ -4,54 +4,36 @@ import React, { useState, useEffect } from "react";
 import { doctors as staticDoctors, Doctor, mapApiDoctorToUi } from "../../lib/doctors";
 import { getDoctors } from "../../lib/api";
 import { User, X } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
-import { PlusBadge } from "./plus-badge";
+// import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { SearchDoctors } from "./search-doctors";
+import { SimpleAvatar } from "@/components/ui/SimpleAvatar";
 
 interface DoctorListProps {
   onSelectDoctor: (doctor: Doctor) => void;
   selectedDoctorId: string | number | null;
   isMobile?: boolean;
   onCloseMobileMenu?: () => void;
+  doctors: Doctor[];
+  isLoading: boolean;
+  error: string | null;
 }
 
 export function DoctorList({ 
   onSelectDoctor, 
   selectedDoctorId,
   isMobile = false, 
-  onCloseMobileMenu = () => {} 
+  onCloseMobileMenu = () => {},
+  doctors,
+  isLoading,
+  error,
 }: DoctorListProps) {
-  const [allDoctors, setAllDoctors] = useState<Doctor[]>(staticDoctors);
-  const [filteredDoctors, setFilteredDoctors] = useState<Doctor[]>(staticDoctors);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [filteredDoctors, setFilteredDoctors] = useState<Doctor[]>(doctors);
 
-  // Загрузка докторов из API
   useEffect(() => {
-    const fetchDoctors = async () => {
-      try {
-        setIsLoading(true);
-        const apiDoctors = await getDoctors();
-        // Преобразуем данные из API в формат, используемый во фронтенде
-        const mappedDoctors = apiDoctors.map(mapApiDoctorToUi);
-        setAllDoctors(mappedDoctors);
-        setFilteredDoctors(mappedDoctors);
-      } catch (err) {
-        console.error("Ошибка при загрузке докторов:", err);
-        setError("Не удалось загрузить список докторов");
-        // Используем статические данные в случае ошибки
-        setAllDoctors(staticDoctors);
-        setFilteredDoctors(staticDoctors);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    setFilteredDoctors(doctors);
+  }, [doctors]);
 
-    fetchDoctors();
-  }, []);
-
-  // Обработчик поиска докторов
   const handleFilterDoctors = (filtered: Doctor[]) => {
     setFilteredDoctors(filtered);
   };
@@ -80,7 +62,7 @@ export function DoctorList({
       )}
       
       {/* Search doctors */}
-      <SearchDoctors onFilteredDoctors={handleFilterDoctors} allDoctors={allDoctors} />
+      <SearchDoctors onFilteredDoctors={handleFilterDoctors} allDoctors={doctors} />
       
       {/* Doctors list */}
       <div className="flex-1 overflow-y-auto">
@@ -103,37 +85,42 @@ export function DoctorList({
           </div>
         ) : (
           <div className="p-3 space-y-2">
-            {filteredDoctors.map((doctor) => (
-              <button
-                key={doctor.id}
-                type="button"
-                onClick={() => onSelectDoctor(doctor)}
-                className={`
-                  w-full text-left p-2 flex items-center space-x-3 
-                  rounded-lg hover:bg-muted
-                  ${selectedDoctorId === doctor.id ? 'bg-blue-50' : ''}
-                `}
-              >
-                <div className="relative">
-                  <Avatar className="h-10 w-10 shrink-0 relative bg-blue-100">
-                    <AvatarImage alt={doctor.name} src={doctor.avatar} draggable="false" />
-                    <AvatarFallback className="bg-gradient-to-br from-blue-100 to-blue-200 text-blue-700">
-                      <User className="h-5 w-5" />
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium truncate">{doctor.name}</p>
-                    {(doctor.isPremium || doctor.is_premium) && <PlusBadge />}
+            {filteredDoctors.map((doctor) => {
+              const avatarSrc = doctor.avatar.startsWith('/uploads/') 
+                ? `${process.env.NEXT_PUBLIC_BACKEND_URL}${doctor.avatar}` 
+                : doctor.avatar;
+                
+              return (
+                <button
+                  key={doctor.id}
+                  type="button"
+                  onClick={() => onSelectDoctor(doctor)}
+                  className={`
+                    w-full text-left p-2 flex items-center space-x-3 
+                    rounded-lg hover:bg-muted
+                    ${selectedDoctorId === doctor.id ? 'bg-blue-50' : ''}
+                  `}
+                >
+                  <div className="relative">
+                    <SimpleAvatar 
+                      src={avatarSrc}
+                      alt={doctor.name || 'Доктор'}
+                      fallbackText={doctor.name ?? undefined}
+                      width={40}
+                      height={40}
+                    />
                   </div>
-                  <p className="text-xs truncate text-gray-500">{doctor.specialty}</p>
-                </div>
-              </button>
-            ))}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium truncate">{doctor.name}</p>
+                    </div>
+                    <p className="text-xs truncate text-gray-500">{doctor.specialty}</p>
+                  </div>
+                </button>
+              );
+            })}
             
-            {filteredDoctors.length === 0 && (
+            {filteredDoctors.length === 0 && !isLoading && (
               <div className="text-center py-8 text-gray-500">
                 <p>Врачи не найдены</p>
                 <p className="text-sm mt-1">Попробуйте изменить запрос</p>

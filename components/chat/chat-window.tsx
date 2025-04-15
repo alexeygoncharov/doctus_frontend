@@ -18,12 +18,19 @@ import {
 } from "../../lib/api";
 import { ChatMessage } from "./chat-message";
 import { Input } from "../../components/ui/input";
-import { SendIcon, Clock, ShieldCheck, Brain, User, Stethoscope, Search, Upload, Camera, MessageSquare } from "lucide-react";
-import { Avatar, AvatarImage, AvatarFallback } from "../../components/ui/avatar"; // Ensure AvatarImage is imported
+import { SendIcon, Clock, ShieldCheck, Brain, User, Stethoscope, Search, Upload, Camera, MessageSquare, SendHorizontal, Paperclip, CornerDownLeft, Mic, Bot } from "lucide-react";
+import { SimpleAvatar } from '@/components/ui/SimpleAvatar';
 import { PlusBadge } from "../../components/doctors/plus-badge";
 import { CameraModal } from "./camera-modal";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { useAuth } from "@/lib/auth-context";
+import { useSession } from 'next-auth/react';
+import { useDropzone } from 'react-dropzone';
+import { toast } from 'sonner';
+import { Button } from "../../components/ui/button";
+// import { Textarea } from "../../components/ui/textarea"; // Закомментировано из-за ошибки
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../components/ui/tooltip";
+import { cn } from '@/lib/utils';
 
 // Локальный интерфейс Message, расширяющий импортированный или определяющий заново
 // Используем `as ImportedMessage` для импорта, чтобы избежать конфликта имен
@@ -36,8 +43,19 @@ interface Message extends Omit<ImportedMessage, 'files'> { // Наследуем
   userAvatar?: string;
   processingFiles?: boolean; // Добавлено для индикатора загрузки файла
   processingStatus?: string; // Добавлено для текста статуса загрузки
-  // @ts-ignore // Игнорируем ошибку TS, т.к. поле fileType добавляется динамически
   fileType?: 'image' | 'document'; 
+}
+
+interface Chat {
+  id: number;
+  doctor_id: number;
+}
+
+interface ApiChatMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: string;
 }
 
 interface ChatWindowProps {
@@ -99,19 +117,12 @@ const EmptyChatState = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative">
-              <Avatar className="h-10 w-10 shrink-0 relative bg-blue-100">
-                <AvatarImage 
-                  alt={doctor.name}
-                  // Safely construct src for header avatar
-                  src={doctor.avatar ? (doctor.avatar.startsWith('http') ? doctor.avatar : `${process.env.NEXT_PUBLIC_API_URL || ''}${doctor.avatar}`) : ''}
-                  draggable="false"
-                  width={40} // Explicit size for header avatar
-                  height={40}
-                />
-                <AvatarFallback className="bg-gradient-to-br from-blue-100 to-blue-200 text-blue-700">
-                  <User className="h-5 w-5" />
-                </AvatarFallback>
-              </Avatar>
+              <SimpleAvatar 
+                src={doctor?.avatar ? (doctor.avatar.startsWith('/uploads/') ? `${process.env.NEXT_PUBLIC_BACKEND_URL}${doctor.avatar}` : doctor.avatar) : undefined}
+                alt={doctor?.name || 'Доктор'} 
+                fallbackText={doctor?.name ?? undefined}
+                className="h-10 w-10"
+              />
               <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white" />
             </div>
             <div>
@@ -129,19 +140,12 @@ const EmptyChatState = ({
       <div className="md:hidden p-3 border-b sticky top-0 bg-white z-10">
         <div className="flex items-center gap-2">
           <div className="relative">
-            <Avatar className="h-8 w-8 shrink-0 relative bg-blue-100">
-              <AvatarImage 
-                alt={doctor.name}
-                // Safely construct src for mobile header avatar
-                 src={doctor.avatar ? (doctor.avatar.startsWith('http') ? doctor.avatar : `${process.env.NEXT_PUBLIC_API_URL || ''}${doctor.avatar}`) : ''}
-                draggable="false"
-                 width={32} // Explicit size for mobile header avatar
-                 height={32}
-              />
-              <AvatarFallback className="bg-gradient-to-br from-blue-100 to-blue-200 text-blue-700">
-                <User className="h-4 w-4" />
-              </AvatarFallback>
-            </Avatar>
+            <SimpleAvatar 
+              src={doctor?.avatar ? (doctor.avatar.startsWith('/uploads/') ? `${process.env.NEXT_PUBLIC_BACKEND_URL}${doctor.avatar}` : doctor.avatar) : undefined}
+              alt={doctor?.name || "Аватар доктора"}
+              fallbackText={doctor?.name ?? undefined}
+              className="h-8 w-8"
+            />
             <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-green-500 border-2 border-white" />
           </div>
           <div>
@@ -159,23 +163,13 @@ const EmptyChatState = ({
         <div className="max-w-md">
           <div className="flex justify-center w-full mb-4">
             <div className="relative">
-                {/* Use Avatar and AvatarImage for optimized display and fallback */}
-                <Avatar className="h-16 w-16 shrink-0 relative bg-blue-100"> {/* Increased size */} 
-                   <AvatarImage 
-                     // Construct the src safely, ensuring doctor and avatar exist
-                     src={doctor?.avatar ? (doctor.avatar.startsWith('http') ? doctor.avatar : `${process.env.NEXT_PUBLIC_API_URL || ''}${doctor.avatar}`) : ''} 
-                     alt={doctor?.name || 'Doctor avatar'} // Provide a default alt text
-                     width={64} // Match the parent size
-                     height={64}
-                     className="h-full w-full object-cover" // Ensure the image covers the area
-                     draggable="false"
-                     // Error handling is now inside AvatarImage component
-                   />
-                   {/* Fallback shown if AvatarImage returns null (e.g., on error or no src) */}
-                   <AvatarFallback className="bg-gradient-to-br from-blue-100 to-blue-200 text-blue-700">
-                     <User className="h-8 w-8" />
-                   </AvatarFallback>
-                 </Avatar>
+                {/* Заменяем Avatar на SimpleAvatar */}
+                <SimpleAvatar 
+                  src={doctor?.avatar ? (doctor.avatar.startsWith('/uploads/') ? `${process.env.NEXT_PUBLIC_BACKEND_URL}${doctor.avatar}` : doctor.avatar) : undefined} 
+                  alt={doctor?.name || 'Аватар доктора'}
+                  fallbackText={doctor?.name ?? undefined}
+                  className="h-16 w-16"
+                />
               <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white online-indicator"></span>
             </div>
           </div>
@@ -286,224 +280,15 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [chatMenuOpen, setChatMenuOpen] = useState(false);
   const [chatId, setChatId] = useState<number | null>(null);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false); // Изначально false, будет true при загрузке
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyAttempted, setHistoryAttempted] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   
-  // Хранение флага истории, которая уже была загружена
-  const [historyAttempted, setHistoryAttempted] = useState<{[key: string]: boolean}>({});
+  const { data: session, status } = useSession();
   
-  // Загрузка истории чата при изменении доктора
-  useEffect(() => {
-    const isDecodeDoctor = typeof doctor === 'object' && doctor !== null && doctor.id.toString() === '20'; // Добавлена проверка doctor !== null
-
-    // Проверка 1: Нет токена авторизации (и это не доктор Расшифровка)
-    if (!isDecodeDoctor && !token) {
-      console.log("useEffect skipped: No active session"); // Для отладки
-      setIsLoadingHistory(false); // Выключаем загрузчик
-      // Не очищаем сообщения здесь, чтобы избежать моргания при логине
-      return; // Выходим
-    }
-
-    // Проверка 2: Доктор не выбран (null)
-    if (!doctor) {
-        console.log("useEffect skipped: Doctor is null"); // Для отладки
-        setIsLoadingHistory(false); // Выключаем загрузчик
-        setMessages([]); // Если доктор не выбран, очищаем сообщения
-        return; // Выходим
-    }
-
-    // ----- С этого момента doctor точно не null -----
-
-    // Проверка 1 и 2: Восстановление несохраненных файлов для ТЕКУЩЕГО чата (если chatId известен)
-    // Оставляем эту логику здесь, т.к. chatId может быть получен из URL или другого источника до загрузки истории
-    if (chatId) {
-      const savedFilesKey = `chat_${chatId}_files`;
-      const savedFilesJson = localStorage.getItem(savedFilesKey);
-
-      if (savedFilesJson) {
-        try {
-          const savedFiles = JSON.parse(savedFilesJson);
-          console.log(`Found ${savedFiles.length} saved files for chat ${chatId} in localStorage`);
-
-          if (savedFiles.length > 0) {
-            // Создаем искусственное сообщение пользователя с файлами
-            const userMessage: Message = {
-              id: `cached-${chatId}-${Date.now()}`,
-              role: "user",
-              content: savedFiles.length > 1 ? "Отправлено несколько файлов" : "Отправлен файл",
-              timestamp: new Date(),
-              files: savedFiles,
-            };
-
-            setMessages(prev => {
-              // Добавляем только если сообщений еще нет (чтобы не дублировать при HMR)
-              if (prev.length === 0) {
-                return [userMessage];
-              }
-              return prev;
-            });
-
-            // Удаляем использованные файлы из хранилища
-            localStorage.removeItem(savedFilesKey);
-            // ВАЖНО: Мы не должны выходить здесь return;,
-            // так как нам все еще нужно загрузить историю чата после восстановления файлов.
-          }
-        } catch (error) {
-          console.error("Error parsing saved files from localStorage:", error);
-        }
-      }
-    } else { // Если chatId еще не известен (например, новый чат)
-      // Проверка 3: Проверяем последний _использованный_ (не обязательно созданный) чат в localStorage
-      // Это может помочь восстановить файлы, если пользователь обновил страницу перед отправкой
-      const lastUsedChatId = localStorage.getItem('last_chat_id'); // Используем 'last_chat_id'
-      if (lastUsedChatId) {
-        const lastFilesKey = `chat_${lastUsedChatId}_files`;
-        const lastFilesJson = localStorage.getItem(lastFilesKey);
-
-        if (lastFilesJson) {
-          try {
-            const lastFiles = JSON.parse(lastFilesJson);
-            // Проверяем, что эти файлы еще не были обработаны (например, через chatId выше)
-            if (lastFiles.length > 0 && messages.length === 0) {
-               console.log(`Found ${lastFiles.length} saved files from last used chat ${lastUsedChatId} in localStorage`);
-              // Создаем искусственное сообщение пользователя с файлами
-              const userMessage: Message = {
-                id: `cached-last-${Date.now()}`,
-                role: "user",
-                content: lastFiles.length > 1 ? "Отправлено несколько файлов" : "Отправлен файл",
-                timestamp: new Date(),
-                files: lastFiles,
-              };
-
-              setMessages([userMessage]); // Устанавливаем как единственное сообщение
-
-              // Удаляем использованные файлы из хранилища
-              localStorage.removeItem(lastFilesKey);
-              // localStorage.removeItem('last_chat_id'); // Не удаляем last_chat_id сразу
-            }
-          } catch (error) {
-            console.error("Error parsing saved files from last used chat:", error);
-          }
-        }
-      }
-    }
-
-    // Проверяем, загружали ли мы уже историю для этого доктора
-    // Теперь это безопасно, так как doctor не null
-    const doctorKey = doctor.id.toString(); // Исправлено: Добавлена проверка doctor !== null выше
-    if (historyAttempted[doctorKey]) {
-      // console.log(`Already attempted loading history for doctor ${doctorKey}, skipping`); // Можно раскомментировать для отладки
-      setIsLoadingHistory(false); // Убедимся, что лоадер выключен, если история уже загружена/попытка была
-      return; // Выходим, если уже пытались загрузить
-    }
-
-    const loadChatHistory = async () => {
-      try {
-        setIsLoadingHistory(true);
-
-        // Помечаем, что мы попытались загрузить историю для этого доктора
-        setHistoryAttempted(prev => ({...prev, [doctorKey]: true}));
-
-        // --- Логика получения userChats ---
-        let userChats: any[] | null = null;
-        if (isDecodeDoctor || token) { // Загружаем чаты только если есть токен или это доктор Расшифровка
-           try {
-             userChats = await getUserChats(); // getUserChats должен использовать токен из localStorage
-             if (!userChats || !Array.isArray(userChats)) {
-               console.error("Invalid user chats response:", userChats);
-               userChats = []; // Считаем, что чатов нет
-             }
-           } catch (chatError) {
-             console.error("Error fetching user chats:", chatError);
-             userChats = []; // Ошибка при загрузке чатов
-             // Не прерываемся, позволяем создать новый чат, если нужно
-           }
-        } else {
-          // На всякий случай, если до сюда дошли без токена (хотя проверка выше должна была отсечь)
-          console.warn("Attempting to load history without authentication (should not happen)");
-          userChats = [];
-        }
-        // --- Конец логики получения userChats ---
-
-
-        // Находим чат с текущим доктором
-        // Теперь это безопасно, т.к. doctor не null
-        const existingChat = userChats?.find(
-          (chat: any) => chat.doctor_id && chat.doctor_id.toString() === doctor.id.toString()
-        );
-
-        if (existingChat) {
-          // Если нашли существующий чат ИЛИ если мы восстановили файлы И chatId не был известен
-          const idToLoad = existingChat.id;
-          if (!chatId || chatId !== idToLoad) setChatId(idToLoad); // Устанавливаем chatId, если его не было или он изменился
-
-          // Загружаем сообщения для найденного/текущего чата
-          const chatMessages = await getChatMessages(idToLoad);
-
-          if (!chatMessages || !Array.isArray(chatMessages)) {
-            console.error("Invalid chat messages response:", chatMessages);
-            // Не очищаем сообщения, если есть восстановленные из кеша
-            if (!messages.some(m => m.id.startsWith('cached-'))) {
-              setMessages([]);
-            }
-            return;
-          }
-
-          // Преобразуем сообщения в формат фронтенда
-          const formattedMessages = chatMessages.map((msg: any) => ({
-            id: msg.id.toString(),
-            role: msg.role as "user" | "assistant" | "system",
-            content: msg.content,
-            timestamp: new Date(msg.timestamp),
-            files: msg.files ? msg.files.map((file: any) => ({
-              name: file.name,
-              size: file.size,
-              type: file.type,
-              url: file.url, // Убедимся, что URL приходит с бэкенда
-              fileId: file.id // Добавляем ID файла с бэкенда
-            })) : []
-          }));
-
-          // Обновляем список сообщений, добавляя загруженные к восстановленным (если были)
-          setMessages(prev => {
-            const cached = prev.filter(m => m.id.startsWith('cached-'));
-            // Проверяем, чтобы не добавить дубликаты, если HMR сработал или история загрузилась повторно
-            const existingIds = new Set(prev.map(m => m.id));
-            const newMessages = formattedMessages.filter(fm => !existingIds.has(fm.id));
-            // Объединяем и сортируем
-            const combined = [...cached, ...newMessages].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-            return combined;
-          });
-
-        } else {
-          // Если чата с этим доктором еще нет
-          // Проверяем, были ли восстановлены сообщения из кеша
-          if (!messages.some(m => m.id.startsWith('cached-'))) {
-            setMessages([]); // Очищаем только если не было восстановленных
-          }
-          setChatId(null); // Сбрасываем chatId, т.к. чата нет
-        }
-      } catch (error) {
-        console.error("Error loading chat history:", error);
-        // В случае ошибки очищаем сообщения, только если не было восстановленных из кеша
-        if (!messages.some(m => m.id.startsWith('cached-'))) {
-          setMessages([]);
-        }
-      } finally {
-        setIsLoadingHistory(false);
-      }
-    };
-
-    // Вызываем загрузку истории
-    loadChatHistory();
-  // Добавляем chatId в зависимости, так как он используется в логике восстановления файлов и загрузки истории
-  // Добавляем setChatId как зависимость
-  }, [doctor, token, setMessages, historyAttempted, chatId, setChatId]); 
-
-
   // Function to scroll to bottom of chat
   const scrollToBottom = useCallback(() => {
     if (chatContainerRef.current) {
@@ -1259,18 +1044,12 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <Avatar className="h-10 w-10 shrink-0 relative bg-blue-100">
-                    <AvatarImage 
-                      alt={doctor.name} // Доктор точно не null
-                      src={doctor.avatar && doctor.avatar.startsWith('http') ? doctor.avatar : `${process.env.NEXT_PUBLIC_API_URL || ''}${doctor.avatar}`}
-                      draggable="false"
-                       width={40} // Added width
-                       height={40} // Added height
-                    />
-                    <AvatarFallback className="bg-gradient-to-br from-blue-100 to-blue-200 text-blue-700">
-                      <User className="h-5 w-5" />
-                    </AvatarFallback>
-                  </Avatar>
+                  <SimpleAvatar 
+                    src={doctor.avatar ? (doctor.avatar.startsWith('/uploads/') ? `${process.env.NEXT_PUBLIC_BACKEND_URL}${doctor.avatar}` : doctor.avatar) : undefined}
+                    alt={doctor.name || 'Доктор'} 
+                    fallbackText={doctor.name ?? undefined}
+                    className="h-10 w-10"
+                  />
                   <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white" />
                 </div>
                 <div>
@@ -1323,18 +1102,12 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="relative">
-                  <Avatar className="h-8 w-8 shrink-0 relative bg-blue-100">
-                    <AvatarImage 
-                      alt={doctor.name} // Доктор точно не null
-                      src={doctor.avatar && doctor.avatar.startsWith('http') ? doctor.avatar : `${process.env.NEXT_PUBLIC_API_URL || ''}${doctor.avatar}`}
-                      draggable="false"
-                      width={32} // Added width
-                      height={32} // Added height
-                    />
-                    <AvatarFallback className="bg-gradient-to-br from-blue-100 to-blue-200 text-blue-700">
-                      <User className="h-4 w-4" />
-                    </AvatarFallback>
-                  </Avatar>
+                  <SimpleAvatar 
+                    src={doctor.avatar ? (doctor.avatar.startsWith('/uploads/') ? `${process.env.NEXT_PUBLIC_BACKEND_URL}${doctor.avatar}` : doctor.avatar) : undefined}
+                    alt={doctor.name || "Аватар доктора"}
+                    fallbackText={doctor.name ?? undefined}
+                    className="h-8 w-8"
+                  />
                   <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-green-500 border-2 border-white" />
                 </div>
                 <div>
@@ -1435,11 +1208,12 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
               <div className="p-4">
                 <div className="space-y-4 w-full">
                   {messages.map((message) => (
-                    <ChatMessage 
-                      doctor={typeof doctor === 'object' ? doctor : null} 
-                      key={message.id} 
-                      message={message}
-                    />
+                    <div key={message.id} className="flex items-start w-full">
+                      <ChatMessage
+                        message={message}
+                        doctor={doctor}
+                      />
+                    </div>
                   ))}
                   <div 
                     ref={messagesEndRef} 

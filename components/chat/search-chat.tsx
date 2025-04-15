@@ -98,7 +98,7 @@ export function SearchChat({ messages, onResultClick, isOpen, onClose }: SearchC
               </div>
               <div className="overflow-hidden">
                 <p className="text-xs text-gray-500 mb-1">
-                  {message.role === "user" ? "Вы" : "Врач"} • {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {message.role === "user" ? "Вы" : "Врач"} • {(message.timestamp instanceof Date ? message.timestamp : new Date(message.timestamp)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </p>
                 <p className="text-sm truncate">{message.content}</p>
               </div>

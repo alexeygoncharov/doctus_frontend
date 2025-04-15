@@ -266,7 +266,18 @@ export default function Home() {
             <div className="bg-white rounded-lg min-w-[261px] lg:min-w-0 p-3.5 lg:p-6 flex flex-col gap-3.5 items-center shadow-sm">
               <div className="relative">
                 <div className="w-28 h-28 rounded-full overflow-hidden relative">
-                  <Image src="/img/doc1.jpg" alt="Кардиолог" className="w-full h-full object-cover" width={112} height={112} />
+                  <Image 
+                    src="/img/doc1.jpg" 
+                    alt="Кардиолог" 
+                    className="w-full h-full object-cover" 
+                    width={112} 
+                    height={112}
+                    onError={(e) => {
+                      console.error("Ошибка загрузки изображения кардиолога");
+                      // Устанавливаем дефолтное изображение при ошибке
+                      e.currentTarget.src = "/avatars/doctor-default.png";
+                    }}
+                  />
                 </div>
                 <span className="absolute bottom-0 right-3.5 rounded-full w-6 h-6 bg-green-500 flex items-center justify-center after:content-[''] after:block after:w-3 after:h-3 after:rounded-full after:bg-green-200"></span>
               </div>
@@ -282,7 +293,17 @@ export default function Home() {
             <div className="bg-white rounded-lg min-w-[261px] lg:min-w-0 p-3.5 lg:p-6 flex flex-col gap-3.5 items-center shadow-sm">
               <div className="relative">
                 <div className="w-28 h-28 rounded-full overflow-hidden relative">
-                  <Image src="/img/doc2.jpg" alt="Уролог" className="w-full h-full object-cover" width={112} height={112} />
+                  <Image 
+                    src="/img/doc2.jpg" 
+                    alt="Уролог" 
+                    className="w-full h-full object-cover" 
+                    width={112} 
+                    height={112}
+                    onError={(e) => {
+                      console.error("Ошибка загрузки изображения уролога");
+                      e.currentTarget.src = "/avatars/doctor-default.png";
+                    }}
+                  />
                 </div>
                 <span className="absolute bottom-0 right-3.5 rounded-full w-6 h-6 bg-green-500 flex items-center justify-center after:content-[''] after:block after:w-3 after:h-3 after:rounded-full after:bg-green-200"></span>
               </div>
@@ -298,7 +319,17 @@ export default function Home() {
             <div className="bg-white rounded-lg min-w-[261px] lg:min-w-0 p-3.5 lg:p-6 flex flex-col gap-3.5 items-center shadow-sm">
               <div className="relative">
                 <div className="w-28 h-28 rounded-full overflow-hidden relative">
-                  <Image src="/img/doc3.jpg" alt="Гинеколог" className="w-full h-full object-cover" width={112} height={112} />
+                  <Image 
+                    src="/img/doc3.jpg" 
+                    alt="Гинеколог" 
+                    className="w-full h-full object-cover" 
+                    width={112} 
+                    height={112}
+                    onError={(e) => {
+                      console.error("Ошибка загрузки изображения гинеколога");
+                      e.currentTarget.src = "/avatars/doctor-default.png";
+                    }}
+                  />
                 </div>
                 <span className="absolute bottom-0 right-3.5 rounded-full w-6 h-6 bg-green-500 flex items-center justify-center after:content-[''] after:block after:w-3 after:h-3 after:rounded-full after:bg-green-200"></span>
               </div>
@@ -314,7 +345,17 @@ export default function Home() {
             <div className="bg-white rounded-lg min-w-[261px] lg:min-w-0 p-3.5 lg:p-6 flex flex-col gap-3.5 items-center shadow-sm">
               <div className="relative">
                 <div className="w-28 h-28 rounded-full overflow-hidden relative">
-                  <Image src="/img/doc4.jpg" alt="Невролог" className="w-full h-full object-cover" width={112} height={112} />
+                  <Image 
+                    src="/img/doc4.jpg" 
+                    alt="Невролог" 
+                    className="w-full h-full object-cover" 
+                    width={112} 
+                    height={112}
+                    onError={(e) => {
+                      console.error("Ошибка загрузки изображения невролога");
+                      e.currentTarget.src = "/avatars/doctor-default.png";
+                    }}
+                  />
                 </div>
                 <span className="absolute bottom-0 right-3.5 rounded-full w-6 h-6 bg-green-500 flex items-center justify-center after:content-[''] after:block after:w-3 after:h-3 after:rounded-full after:bg-green-200"></span>
               </div>
@@ -330,7 +371,17 @@ export default function Home() {
             <div className="bg-white rounded-lg min-w-[261px] lg:min-w-0 p-3.5 lg:p-6 flex flex-col gap-3.5 items-center shadow-sm">
               <div className="relative">
                 <div className="w-28 h-28 rounded-full overflow-hidden relative">
-                  <Image src="/img/doc5.jpg" alt="Эндокринолог" className="w-full h-full object-cover" width={112} height={112} />
+                  <Image 
+                    src="/img/doc5.jpg" 
+                    alt="Эндокринолог" 
+                    className="w-full h-full object-cover" 
+                    width={112} 
+                    height={112}
+                    onError={(e) => {
+                      console.error("Ошибка загрузки изображения эндокринолога");
+                      e.currentTarget.src = "/avatars/doctor-default.png";
+                    }}
+                  />
                 </div>
                 <span className="absolute bottom-0 right-3.5 rounded-full w-6 h-6 bg-green-500 flex items-center justify-center after:content-[''] after:block after:w-3 after:h-3 after:rounded-full after:bg-green-200"></span>
               </div>
@@ -346,7 +397,17 @@ export default function Home() {
             <div className="bg-white rounded-lg min-w-[261px] lg:min-w-0 p-3.5 lg:p-6 flex flex-col gap-3.5 items-center shadow-sm">
               <div className="relative">
                 <div className="w-28 h-28 rounded-full overflow-hidden relative">
-                  <Image src="/img/doc6.jpg" alt="Гастроэнтеролог" className="w-full h-full object-cover" width={112} height={112} />
+                  <Image 
+                    src="/img/doc6.jpg" 
+                    alt="Гастроэнтеролог" 
+                    className="w-full h-full object-cover" 
+                    width={112} 
+                    height={112}
+                    onError={(e) => {
+                      console.error("Ошибка загрузки изображения гастроэнтеролога");
+                      e.currentTarget.src = "/avatars/doctor-default.png";
+                    }}
+                  />
                 </div>
                 <span className="absolute bottom-0 right-3.5 rounded-full w-6 h-6 bg-green-500 flex items-center justify-center after:content-[''] after:block after:w-3 after:h-3 after:rounded-full after:bg-green-200"></span>
               </div>
@@ -362,7 +423,17 @@ export default function Home() {
             <div className="bg-white rounded-lg min-w-[261px] lg:min-w-0 p-3.5 lg:p-6 flex flex-col gap-3.5 items-center shadow-sm">
               <div className="relative">
                 <div className="w-28 h-28 rounded-full overflow-hidden relative">
-                  <Image src="/img/doc7.jpg" alt="Дерматолог" className="w-full h-full object-cover" width={112} height={112} />
+                  <Image 
+                    src="/img/doc7.jpg" 
+                    alt="Дерматолог" 
+                    className="w-full h-full object-cover" 
+                    width={112} 
+                    height={112}
+                    onError={(e) => {
+                      console.error("Ошибка загрузки изображения дерматолога");
+                      e.currentTarget.src = "/avatars/doctor-default.png";
+                    }}
+                  />
                 </div>
                 <span className="absolute bottom-0 right-3.5 rounded-full w-6 h-6 bg-green-500 flex items-center justify-center after:content-[''] after:block after:w-3 after:h-3 after:rounded-full after:bg-green-200"></span>
               </div>
@@ -378,7 +449,17 @@ export default function Home() {
             <div className="bg-white rounded-lg min-w-[261px] lg:min-w-0 p-3.5 lg:p-6 flex flex-col gap-3.5 items-center shadow-sm">
               <div className="relative">
                 <div className="w-28 h-28 rounded-full overflow-hidden relative">
-                  <Image src="/img/doc8.jpg" alt="Терапевт" className="w-full h-full object-cover" width={112} height={112} />
+                  <Image 
+                    src="/img/doc8.jpg" 
+                    alt="Терапевт" 
+                    className="w-full h-full object-cover" 
+                    width={112} 
+                    height={112}
+                    onError={(e) => {
+                      console.error("Ошибка загрузки изображения терапевта");
+                      e.currentTarget.src = "/avatars/doctor-default.png";
+                    }}
+                  />
                 </div>
                 <span className="absolute bottom-0 right-3.5 rounded-full w-6 h-6 bg-green-500 flex items-center justify-center after:content-[''] after:block after:w-3 after:h-3 after:rounded-full after:bg-green-200"></span>
               </div>
@@ -466,18 +547,23 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="pb-10 sm:pb-15 md:pt-15">
-        <div className="max-w-320 mx-auto px-4">
-          <h2 className="text-xl sm:text-3xl md:text-4xl lg:text-[44px] lg:leading-[60px] font-semibold text-center pl-3 pr-3 text-headerText mb-10">Статьи нашего блога</h2>
-          <div className="grid gap-6 grid-cols-1 md:grid-cols-3 mb-10">
-            {/* Blog posts will be loaded dynamically from the API */}
-            <BlogCardPreview />
+      <section className="pb-10 sm:pb-15 md:pb-12 lg:py-15 px-4 bg-gradient-to-b from-[#f9fafb] to-white">
+        <div className="max-w-320 mx-auto flex flex-col gap-y-6 md:gap-y-8 lg:gap-y-10 items-center">
+          <h2 className="text-xl sm:text-3xl md:text-4xl lg:text-[44px] lg:leading-[60px] font-semibold text-center text-headerText">
+            Блог о здоровье
+          </h2>
+          <p className="text-center max-w-227.5 text-sm sm:text-base md:text-lg text-gray-600">
+            Узнайте больше о здоровье, профилактике и современных методах лечения в наших статьях.
+          </p>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 w-full mt-4">
+             <BlogCardPreview />
           </div>
-          <div className="flex justify-center">
-            <Link href="/blog" className="px-6 py-3 border border-blue-500 text-blue-500 rounded-md hover:bg-blue-50 transition">
-              Посмотреть все статьи
-            </Link>
-          </div>
+          <Link href="/blog" className="mt-4 inline-flex items-center justify-center px-5 py-3 text-base font-medium text-center text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300">
+             Все статьи блога
+            <svg className="ml-2 -mr-1 w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd"></path>
+            </svg>
+          </Link>
         </div>
       </section>
 
