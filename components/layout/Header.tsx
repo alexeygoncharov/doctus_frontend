@@ -123,52 +123,38 @@ const Header: React.FC = () => {
   return (
     <header className={`bg-white px-4 ${isSticky ? 'sticky top-0 z-50 shadow-md transition-all' : ''}`}>
       <div className="max-w-320 w-full mx-auto">
-        <nav className="flex items-center justify-between py-3.5 sm:py-4 gap-2" aria-label="Global">
+        <nav className="flex items-center justify-between py-3.5 sm:py-4 gap-4" aria-label="Global">
           {/* Logo */}
-          <div style={{ position: 'relative', width: 'auto', minWidth: '0', flex: 'none' }}>
-            <Link href="/" className="block" style={{ position: 'relative', display: 'block', width: 'auto', height: '32px' }}>
-              <span style={{
-                position: 'absolute',
-                left: 0,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                display: 'flex',
-                alignItems: 'center',
-                height: '32px',
-                whiteSpace: 'nowrap'
-              }}>
-                <Image
-                  src="/img/logo.svg"
-                  alt="Logo"
-                  width={32}
-                  height={32}
-                  style={{
-                    display: 'inline-block',
-                    verticalAlign: 'middle',
-                    width: '32px',
-                    height: '32px',
-                    minWidth: '32px',
-                    minHeight: '32px'
-                  }}
-                />
-                <span
-                  style={{
-                    display: 'inline-block',
-                    marginLeft: '10px',
-                    fontSize: '22px',
-                    lineHeight: '32px',
-                    fontWeight: 500,
-                    color: '#1B1B1B'
-                  }}
-                >
-                  Доктус
-                </span>
+          <div className="flex-shrink-0">
+            <Link href="/" className="flex items-center gap-2.5">
+              <Image
+                src="/img/logo.svg"
+                alt="Logo"
+                width={32}
+                height={32}
+                style={{
+                  display: 'inline-block',
+                  verticalAlign: 'middle',
+                  width: '32px',
+                  height: '32px',
+                  minWidth: '32px',
+                  minHeight: '32px'
+                }}
+              />
+              <span
+                style={{
+                  fontSize: '22px',
+                  lineHeight: '32px',
+                  color: '#1B1B1B'
+                }}
+              >
+                Доктус
               </span>
             </Link>
           </div>
 
           {/* Desktop Navigation */}
-          <ul className="hidden lg:flex lg:gap-x-2 xl:max-w-135 max-w-110 w-full justify-between">
+          <ul className="hidden lg:flex lg:gap-x-4 xl:gap-x-6 flex-grow justify-center items-center">
              {/* Consultation Dropdown */}
              <li className="has-child relative group/items">
                <Link href="#" className="text-sm xl:text-base py-2 font-medium text-[#1B1B1B] group-hover/items:text-blue-500 transition flex items-center gap-x-2">

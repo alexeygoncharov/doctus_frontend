@@ -45,7 +45,6 @@ export default function App({ Component, pageProps }: AppProps) {
       const savedAvatar = localStorage.getItem('userAvatar');
       if (savedAvatar) {
         setAvatarUrl(savedAvatar);
-        console.log('Initial avatar loaded from localStorage:', savedAvatar);
       }
     }
   }, []);
@@ -81,8 +80,6 @@ export default function App({ Component, pageProps }: AppProps) {
     detailsElements.forEach(detail => detail.addEventListener('toggle', handleDetailsToggle));
 
     window.updateUserAvatar = (avatarUrl: string) => {
-      console.log('Avatar updated via global function:', avatarUrl);
-      
       // Обновляем в localStroage для будущих загрузок страницы
       localStorage.setItem('userAvatar', avatarUrl);
       

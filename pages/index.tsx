@@ -62,6 +62,21 @@ export default function Home() {
       <Head>
         <title>Онлайн консультация ИИ доктора</title>
         <meta name="description" content="Онлайн консультация ИИ доктора - задайте вопрос, загрузите анализы и фото, получите рекомендации" />
+        <link rel="canonical" href="https://your-website-url.com/" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            "url": "https://your-website-url.com/",
+            "name": "Онлайн консультация ИИ доктора",
+            "potentialAction": {
+              "@type": "SearchAction",
+              "target": "https://your-website-url.com/search?q={search_term_string}",
+              "query-input": "required name=search_term_string"
+            }
+          }) }}
+        />
       </Head>
 
       <section className="px-0 md:px-2">
@@ -77,11 +92,11 @@ export default function Home() {
               <div className="flex items-center rounded-[72px] bg-white px-4.5 py-1 sm:py-1.5 gap-2.5">
                 <span className="font-semibold text-base sm:text-xl leading-relaxed">5.0</span>
                 <div className="flex items-center gap-1 sm:gap-1.5">
-                  <img alt="Star" loading="lazy" width="20" height="20" decoding="async" data-nimg="1" className="w-3.5 sm:w-5" src="/icons/icon-star.svg" style={{ color: 'transparent' }} />
-                  <img alt="Star" loading="lazy" width="20" height="20" decoding="async" data-nimg="1" className="w-3.5 sm:w-5" src="/icons/icon-star.svg" style={{ color: 'transparent' }} />
-                  <img alt="Star" loading="lazy" width="20" height="20" decoding="async" data-nimg="1" className="w-3.5 sm:w-5" src="/icons/icon-star.svg" style={{ color: 'transparent' }} />
-                  <img alt="Star" loading="lazy" width="20" height="20" decoding="async" data-nimg="1" className="w-3.5 sm:w-5" src="/icons/icon-star.svg" style={{ color: 'transparent' }} />
-                  <img alt="Star" loading="lazy" width="20" height="20" decoding="async" data-nimg="1" className="w-3.5 sm:w-5" src="/icons/icon-star.svg" style={{ color: 'transparent' }} />
+                  <Image alt="Star" loading="lazy" width="20" height="20" className="w-3.5 sm:w-5" src="/icons/icon-star.svg" />
+                  <Image alt="Star" loading="lazy" width="20" height="20" className="w-3.5 sm:w-5" src="/icons/icon-star.svg" />
+                  <Image alt="Star" loading="lazy" width="20" height="20" className="w-3.5 sm:w-5" src="/icons/icon-star.svg" />
+                  <Image alt="Star" loading="lazy" width="20" height="20" className="w-3.5 sm:w-5" src="/icons/icon-star.svg" />
+                  <Image alt="Star" loading="lazy" width="20" height="20" className="w-3.5 sm:w-5" src="/icons/icon-star.svg" />
                 </div>
               </div>
               <p className="text-[13px] sm:text-[15px] font-medium">2000+ пользователей</p>
