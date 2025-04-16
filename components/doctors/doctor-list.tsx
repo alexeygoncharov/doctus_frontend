@@ -117,7 +117,7 @@ export function DoctorList({
                       <p className="font-medium truncate">{doctor.name}</p>
                       {doctor.isPremium && <PlusBadge />}
                     </div>
-                    <p className="text-xs truncate text-gray-500">{doctor.specialty}</p>
+                    <p className="text-xs truncate text-gray-500">{doctor.description}</p>
                   </div>
                 </button>
               );
