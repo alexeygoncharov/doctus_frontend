@@ -8,6 +8,7 @@ import { useEffect, useState, createContext } from 'react';
 import 'nprogress/nprogress.css';
 import Head from 'next/head';
 import { AuthProvider } from '@/lib/auth-context'; // This now includes SessionProvider
+import { MessageLimitProvider } from '@/lib/message-limit-context'; // Импортируем провайдер лимита сообщений
 import MainLayout from '@/components/layout/MainLayout';
 import AuthLayout from '@/components/layout/AuthLayout';
 
@@ -168,23 +169,25 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     // Wrap the entire app in AuthProvider, which now includes SessionProvider
     <AuthProvider>
-      <Head>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="description" content="ИИ доктор - онлайн консультация с искусственным интеллектом. Расшифровка анализов, медицинские рекомендации." />
-        <link rel="icon" href="/favicon.png" />
-      </Head>
-      {/* AvatarContext can wrap the layout if needed by components within */}
-      <AvatarContext.Provider value={{ avatarUrl, updateAvatar: setAvatarUrl }}>
-        {isAuthPage ? (
-          <AuthLayout>
-            <Component {...pageProps} />
-          </AuthLayout>
-        ) : (
-          <MainLayout>
-            <Component {...pageProps} />
-          </MainLayout>
-        )}
-      </AvatarContext.Provider>
+      <MessageLimitProvider>
+        <Head>
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <meta name="description" content="ИИ доктор - онлайн консультация с искусственным интеллектом. Расшифровка анализов, медицинские рекомендации." />
+          <link rel="icon" href="/favicon.png" />
+        </Head>
+        {/* AvatarContext can wrap the layout if needed by components within */}
+        <AvatarContext.Provider value={{ avatarUrl, updateAvatar: setAvatarUrl }}>
+          {isAuthPage ? (
+            <AuthLayout>
+              <Component {...pageProps} />
+            </AuthLayout>
+          ) : (
+            <MainLayout>
+              <Component {...pageProps} />
+            </MainLayout>
+          )}
+        </AvatarContext.Provider>
+      </MessageLimitProvider>
     </AuthProvider>
   );
 }

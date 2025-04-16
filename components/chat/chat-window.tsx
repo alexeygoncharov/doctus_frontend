@@ -31,6 +31,8 @@ import { Button } from "../../components/ui/button";
 // import { Textarea } from "../../components/ui/textarea"; // Закомментировано из-за ошибки
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../components/ui/tooltip";
 import { cn } from '@/lib/utils';
+import { useMessageLimit } from '@/lib/message-limit-context';
+import { PricingModal } from "@/components/pricing/pricing-modal";
 
 // Локальный интерфейс Message, расширяющий импортированный или определяющий заново
 // Используем `as ImportedMessage` для импорта, чтобы избежать конфликта имен
@@ -274,7 +276,16 @@ const EmptyChatState = ({
 };
 
 export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
-  const { user, token } = useAuth();
+  const { data: session } = useSession();
+  const isAuthenticated = !!session;
+  const { token, user } = useAuth();
+  
+  // Добавляем хук для использования лимита сообщений
+  const { messagesCount, messagesLimit, incrementCount, hasReachedLimit } = useMessageLimit();
+  
+  // Состояние для модального окна с оплатой
+  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
+  
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -286,8 +297,6 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  
-  const { data: session, status } = useSession();
   
   // Function to scroll to bottom of chat
   const scrollToBottom = useCallback(() => {
@@ -368,25 +377,48 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
     fetchMessages();
   }, [chatId, messages.length, isLoadingHistory]);
 
+  // Определяем, есть ли активная подписка
+  const hasActiveSubscription = !!user?.subscription?.is_active;
+
+  // Функция для проверки лимита сообщений
+  const checkMessageLimit = (): boolean => {
+    // Пользователи с подпиской имеют безлимит
+    if (hasActiveSubscription) {
+      return true;
+    }
+
+    // Для всех остальных (неавторизованных И авторизованных без подписки)
+    // проверяем лимит, который отслеживается в useMessageLimit
+    if (hasReachedLimit) {
+      setIsPricingModalOpen(true); // Показываем модалку, если лимит достигнут
+      return false;
+    }
+
+    return true; // Лимит не достигнут
+  };
+  
   const handleSendMessage = async () => {
-    if ((!input.trim() && !fileInputRef.current?.files?.length) || !doctor) return;
+    if (input.trim() === '' && !fileInputRef.current?.files?.length) return;
+
+    if (!doctor) return; // Проверяем, что doctor не undefined
     
-    // Специальное исключение для доктора "Расшифровка" (ID 20)
-    // Доктор уже проверен на null выше
-    const isDecodeDoctor = doctor.id.toString() === '20';
-    
-    // Проверяем авторизацию (кроме доктора "Расшифровка")
-    if (!token && !isDecodeDoctor) {
-      // console.log('DEBUG: User data from useAuth in handleSendMessage:', user);
-      toast.error("Пожалуйста, войдите в систему для отправки сообщений");
-      setIsLoading(false);
+    // Проверяем лимит сообщений перед отправкой
+    if (!checkMessageLimit()) {
       return;
     }
+    
+    // Инкрементируем счетчик, ТОЛЬКО если НЕТ активной подписки
+    if (!hasActiveSubscription) {
+      incrementCount();
+    }
+    
+    // Специальное исключение для доктора "Расшифровка" (ID 20)
+    const isDecodeDoctor = doctor.id.toString() === '20';
     
     // Проверяем, доступен ли врач для текущей подписки
     // Доктор "Расшифровка" доступен без подписки и авторизации
     // @ts-ignore // Игнорируем ошибку TS, предполагая, что тип Session расширен
-    if (!isDecodeDoctor && doctor.isPremium && user?.subscription?.plan?.type !== 'premium') { 
+    if (!isDecodeDoctor && doctor.isPremium && isAuthenticated && !hasActiveSubscription) { 
       // Показываем сообщение о необходимости подписки для Plus врачей
       const event = new CustomEvent("showPricing");
       window.dispatchEvent(event);
@@ -394,7 +426,6 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
     }
     
     // Get user avatar from session
-    // console.log('DEBUG: User data from useAuth in handleSendMessage:', user);
     const userAvatar = user?.avatar || undefined;
     
     const userMessage: Message = {
@@ -452,7 +483,7 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
       // Доктор уже проверен на null
       if (userMessage.files?.length && !currentChatId) {
         try {
-          const newChat = await createChat(Number(doctor.id));
+          const newChat = await createChat(Number(doctor?.id));
           currentChatId = newChat.id;
           setChatId(currentChatId);
           
@@ -569,6 +600,16 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     // Доктор проверен на null выше в useEffect
     if (event.target.files?.length && doctor) { 
+      // Проверяем лимит сообщений перед загрузкой файлов
+      if (!checkMessageLimit()) {
+        return;
+      }
+      
+      // Инкрементируем счетчик, ТОЛЬКО если НЕТ активной подписки
+      if (!hasActiveSubscription) {
+        incrementCount();
+      }
+      
       try {
         setIsLoading(true);
         
@@ -796,6 +837,16 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
   const handleCameraCapture = async (capturedImages: FileData[]) => {
     // Доктор проверен на null выше в useEffect
     if (capturedImages.length > 0 && doctor) { 
+      // Проверяем лимит сообщений перед отправкой фото
+      if (!checkMessageLimit()) {
+        return;
+      }
+      
+      // Инкрементируем счетчик, ТОЛЬКО если НЕТ активной подписки
+      if (!hasActiveSubscription) {
+        incrementCount();
+      }
+      
       try {
         setIsLoading(true);
         
@@ -1012,6 +1063,14 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
       document.removeEventListener('click', handleClickOutside);
     };
   }, [chatMenuOpen]);
+  
+  // Добавляем обработчик для проверки лимита при фокусе на поле ввода
+  const handleInputFocus = () => {
+    // Показываем модалку, если лимит достигнут И НЕТ подписки
+    if (!hasActiveSubscription && hasReachedLimit) {
+      setIsPricingModalOpen(true);
+    }
+  };
   
   // Add refs to the outer scope so they can be passed to EmptyChatState
   // Экран загрузки истории чата - только если доктор выбран и история загружается
@@ -1288,6 +1347,7 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
                 autoComplete="off"
                 autoFocus={false}
                 value={input}
+                onFocus={handleInputFocus}
               />
               <button 
                 className="h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-full bg-blue-500 text-white disabled:opacity-50" 
@@ -1347,6 +1407,16 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
         onCapture={handleCameraCapture} 
         onClose={() => setIsCameraOpen(false)}
         open={isCameraOpen}
+      />
+      
+      {/* Добавляем компонент модального окна для оплаты */}
+      <PricingModal
+        isOpen={isPricingModalOpen}
+        onClose={() => setIsPricingModalOpen(false)}
+        subscription={user?.subscription || null}
+        onSubscribe={async () => {
+          setIsPricingModalOpen(false);
+        }}
       />
     </div>
   );

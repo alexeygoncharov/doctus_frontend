@@ -145,7 +145,7 @@ const PlansPage = () => {
         <div className="pt-6 md:pt-15 pb-10 md:pb-20 px-4 md:rounded-2xl lg:rounded-5 bg-linear-to-b from-[#EAF1FC] to-slate-50">
           <div className="max-w-320 mx-auto flex flex-col gap-y-6 md:gap-y-8 lg:gap-y-10 items-center">
             <div className="bg-white flex items-center gap-4 md:gap-1 rounded-3xl py-2 px-4 md:px-5 max-w-64.5 md:max-w-full">
-              <Image src="/images/icons/stars.svg" alt="Start" width={40} height={40} />
+              <Image src="/images/icons/stars.svg" alt="Start" width={24} height={24} />
               <span className="text-xs md:text-sm">Умные советы ИИ для быстрых и достоверных результатов</span>
             </div>
             <h1 className="text-center text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold max-w-227.5">Планы подписки</h1>

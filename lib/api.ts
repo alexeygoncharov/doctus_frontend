@@ -420,107 +420,139 @@ export async function cancelSubscription(): Promise<SubscriptionResponse> {
 
 // --- Chat Functions (using updated ApiClient where appropriate) ---
 
-// Needs careful review based on authentication requirements for doctor 20
+// Функция для получения или генерации ID неавторизованного пользователя
+export function getGuestUserId(): string {
+  if (typeof window !== 'undefined') {
+    // Пытаемся получить существующий ID из localStorage
+    let guestId = localStorage.getItem('guest_user_id');
+    
+    // Если ID нет, генерируем новый и сохраняем
+    if (!guestId) {
+      guestId = 'guest_' + Math.random().toString(36).substring(2, 15);
+      localStorage.setItem('guest_user_id', guestId);
+    }
+    
+    return guestId;
+  }
+  
+  // Если вызывается на сервере, возвращаем временный ID
+  return 'guest_temp_' + Math.random().toString(36).substring(2, 15);
+}
+
+// Модифицируем функцию отправки сообщения для работы с неавторизованными пользователями
 export async function sendMessage(doctorId: string | number, message: string, files: any[] = [], chatId?: number | null): Promise<Message> {
   try {
-    const messageData = {
-      role: "user" as const,
-      content: message,
-      files: files?.map(file => file?.id || file).filter(id => id) ?? [] // Ensure only valid IDs
-    };
-
-    let effectiveChatId = chatId;
-    if (!effectiveChatId) {
-      try {
-        const chats = await ApiClient.get('/chats'); // Requires auth
-        const existingChat = chats.find((chat: any) => chat.doctor_id.toString() === doctorId.toString());
-        if (existingChat) {
-          effectiveChatId = existingChat.id;
-        }
-      } catch (error) {
-        console.error("Error fetching chats (might be expected if not logged in):", error);
-        // Proceed without chatId if fetching fails (e.g., for doctor 20)
-      }
-    }
-
-    const streamUrl = effectiveChatId
-      ? `${API_URL}/chats/${effectiveChatId}/messages/stream`
-      : `${API_URL}/chats/doctor/${doctorId}/messages/stream`;
-
-    const messageId = crypto.randomUUID();
+    const token = await ApiClient.getAuthToken();
     const isDecodeDoctor = doctorId.toString() === '20';
-    const token = await ApiClient.getAuthToken(); // Get token using the helper
+    
+    // Если пользователь авторизован или это доктор-расшифровщик, используем API
+    if (token || isDecodeDoctor) {
+      const messageData = {
+        role: "user" as const,
+        content: message,
+        files: files?.map(file => file?.id || file).filter(id => id) ?? [] // Ensure only valid IDs
+      };
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Accept': 'text/event-stream' // Important for SSE
-    };
-
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    } else if (!isDecodeDoctor) {
-      throw new Error("Требуется авторизация для отправки сообщений этому доктору.");
-    }
-
-    // Use fetch directly for streaming response handling
-    const response = await fetch(streamUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(messageData),
-      mode: 'cors'
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Error sending message: ${response.status} - ${errorText}`);
-    }
-
-    const streamingMessage: Message = {
-      id: messageId,
-      role: "assistant",
-      content: "",
-      timestamp: new Date(),
-      isStreaming: true,
-    };
-
-    const reader = response.body?.getReader();
-    if (!reader) throw new Error("Не удалось получить reader для потока.");
-
-    // Process stream in background, return initial message object immediately
-    (async () => {
-        const decoder = new TextDecoder();
-        let done = false;
-        let fullResponse = "";
+      let effectiveChatId = chatId;
+      if (!effectiveChatId) {
         try {
-            while (!done) {
-                const { value, done: doneReading } = await reader.read();
-                done = doneReading;
-                if (value) {
-                    const chunk = decoder.decode(value, { stream: true });
-                    fullResponse += chunk;
-                    // Dispatch update event
-                    window.dispatchEvent(new CustomEvent('chat-message-update', {
-                        detail: { id: messageId, content: fullResponse }
-                    }));
-                    await new Promise(resolve => setTimeout(resolve, 30)); // Small delay
-                }
-            }
-            // Dispatch final event
-            window.dispatchEvent(new CustomEvent('chat-message-complete', {
-                detail: { id: messageId, content: fullResponse, isStreaming: false }
-            }));
+          const chats = await ApiClient.get('/chats'); // Requires auth
+          const existingChat = chats.find((chat: any) => chat.doctor_id.toString() === doctorId.toString());
+          if (existingChat) {
+            effectiveChatId = existingChat.id;
+          }
         } catch (error) {
-             console.error("Error processing stream:", error);
-             window.dispatchEvent(new CustomEvent('chat-message-error', {
-                 detail: { id: messageId, error: error instanceof Error ? error.message : 'Ошибка обработки потока' }
-             }));
+          console.error("Error fetching chats (might be expected if not logged in):", error);
+          // Proceed without chatId if fetching fails (e.g., for doctor 20)
         }
-    })();
+      }
 
-    return streamingMessage;
+      const streamUrl = effectiveChatId
+        ? `${API_URL}/chats/${effectiveChatId}/messages/stream`
+        : `${API_URL}/chats/doctor/${doctorId}/messages/stream`;
 
+      const messageId = crypto.randomUUID();
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream' // Important for SSE
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      } else if (!isDecodeDoctor) {
+        throw new Error("Требуется авторизация для отправки сообщений этому доктору.");
+      }
+
+      // Use fetch directly for streaming response handling
+      const response = await fetch(streamUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(messageData),
+        mode: 'cors'
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error sending message: ${response.status} - ${errorText}`);
+      }
+
+      const streamingMessage: Message = {
+        id: messageId,
+        role: "assistant",
+        content: "",
+        timestamp: new Date(),
+        isStreaming: true,
+      };
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("Не удалось получить reader для потока.");
+
+      // Process stream in background, return initial message object immediately
+      (async () => {
+          const decoder = new TextDecoder();
+          let done = false;
+          let fullResponse = "";
+          try {
+              while (!done) {
+                  const { value, done: doneReading } = await reader.read();
+                  done = doneReading;
+                  if (value) {
+                      const chunk = decoder.decode(value, { stream: true });
+                      fullResponse += chunk;
+                      // Dispatch update event
+                      window.dispatchEvent(new CustomEvent('chat-message-update', {
+                          detail: { id: messageId, content: fullResponse }
+                      }));
+                      await new Promise(resolve => setTimeout(resolve, 30)); // Small delay
+                  }
+              }
+              // Dispatch final event
+              window.dispatchEvent(new CustomEvent('chat-message-complete', {
+                  detail: { id: messageId, content: fullResponse, isStreaming: false }
+              }));
+          } catch (error) {
+               console.error("Error processing stream:", error);
+               window.dispatchEvent(new CustomEvent('chat-message-error', {
+                   detail: { id: messageId, error: error instanceof Error ? error.message : 'Ошибка обработки потока' }
+               }));
+          }
+      })();
+
+      return streamingMessage;
+    } else {
+      // Для неавторизованных пользователей - симулируем backend-ответ
+      // Генерируем случайную задержку от 1 до 3 секунд для имитации сети
+      const delay = Math.floor(Math.random() * 2000) + 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      // Создаем и возвращаем ответ ассистента
+      const guestResponse: Message = await getAIResponseForGuest(doctorId, message);
+      
+      return guestResponse;
+    }
   } catch (error) {
-    console.error("Error in sendMessage:", error);
+    console.error('Error sending message:', error);
     return {
       id: crypto.randomUUID(),
       role: "assistant",
@@ -528,6 +560,75 @@ export async function sendMessage(doctorId: string | number, message: string, fi
       timestamp: new Date(),
     };
   }
+}
+
+// Функция для создания чата, работает как для авторизованных, так и для неавторизованных пользователей
+export async function createChat(doctorId: number): Promise<{id: number}> {
+  try {
+    const token = await ApiClient.getAuthToken();
+    const isDecodeDoctor = doctorId === 20;
+    
+    // Если пользователь авторизован или это доктор-расшифровщик, используем API
+    if (token || isDecodeDoctor) {
+      // console.log(`Creating chat with doctor ID ${doctorId}`);
+      
+      if (!token && !isDecodeDoctor) {
+        throw new Error("Требуется авторизация для создания этого чата.");
+      }
+      
+      // Use ApiClient which will handle the token correctly
+      const response = await ApiClient.post('/chats', { doctor_id: doctorId });
+      return { id: response.id };
+    } else {
+      // Для неавторизованных пользователей создаем локальный ID чата
+      const tempChatId = Number(Date.now().toString().slice(-8));
+      
+      // Можно сохранить в localStorage для постоянства в рамках сессии
+      const guestChats = JSON.parse(localStorage.getItem('guest_chats') || '{}');
+      guestChats[doctorId] = tempChatId;
+      localStorage.setItem('guest_chats', JSON.stringify(guestChats));
+      
+      return { id: tempChatId };
+    }
+  } catch (error) {
+    console.error(`Error creating chat with doctor ${doctorId}:`, error);
+    throw error;
+  }
+}
+
+// Функция для получения ответа от ИИ для неавторизованных пользователей
+// Это упрощенная версия, которая симулирует ответ ассистента с задержкой
+async function getAIResponseForGuest(doctorId: string | number, userMessage: string): Promise<Message> {
+  // Симулируем задержку от 1 до 3 секунд
+  const delay = Math.floor(Math.random() * 2000) + 1000;
+  await new Promise(resolve => setTimeout(resolve, delay));
+  
+  // Генерируем уникальный ID для ответа
+  const responseId = 'local_response_' + Math.random().toString(36).substring(2, 15);
+  
+  // Простая логика для определения ответа на основе ключевых слов
+  let responseContent = '';
+  const lowerMessage = userMessage.toLowerCase();
+  
+  if (lowerMessage.includes('привет') || lowerMessage.includes('здравствуй')) {
+    responseContent = 'Здравствуйте! Я ИИ-доктор и могу ответить на ваши медицинские вопросы. Чем я могу вам помочь?';
+  } else if (lowerMessage.includes('головн') && lowerMessage.includes('боль')) {
+    responseContent = 'Головная боль может быть вызвана множеством причин: стресс, усталость, недостаток сна, обезвоживание, и многие другие. Важно обратить внимание на характер боли, её локализацию, частоту и сопутствующие симптомы. Если головные боли сильные, частые или сопровождаются другими симптомами, рекомендую обратиться к врачу для очной консультации.';
+  } else if (lowerMessage.includes('температур') || lowerMessage.includes('жар')) {
+    responseContent = 'Повышенная температура обычно является защитной реакцией организма на инфекцию. Если температура не превышает 38.5°C, можно наблюдать и обильно пить жидкость. Если температура выше или держится более 3 дней, необходимо обратиться к врачу. Также важно обратиться к врачу, если повышенная температура сопровождается другими тревожными симптомами.';
+  } else if (lowerMessage.includes('тошнит') || lowerMessage.includes('тошнота') || lowerMessage.includes('рвота')) {
+    responseContent = 'Тошнота и рвота могут быть вызваны различными причинами: от пищевого отравления до более серьезных заболеваний. Важно обеспечить достаточное питье для предотвращения обезвоживания. Если симптомы сильные, длятся более 24 часов или сопровождаются другими тревожными признаками (высокая температура, сильная боль), следует обратиться к врачу.';
+  } else {
+    responseContent = 'Спасибо за ваш вопрос. Для более точной консультации рекомендую зарегистрироваться или авторизоваться, чтобы получить доступ к полному функционалу нашего сервиса. В бесплатном режиме доступно до 20 сообщений.';
+  }
+  
+  return {
+    id: responseId,
+    content: responseContent,
+    role: 'assistant',
+    timestamp: new Date(),
+    files: [],
+  };
 }
 
 // Add DoctorResponse type if it doesn't exist
@@ -586,17 +687,36 @@ export async function getUserChats() {
   }
 }
 
-// Authenticated endpoint
+// Объявляем интерфейс для сообщений API
+interface ApiChatMessage {
+  id: string;
+  role: string;
+  content: string;
+  timestamp: string;
+  files?: any[];
+}
+
+// Get chat messages for a specific chat
 export async function getChatMessages(chatId: number, skip: number = 0, limit: number = 100) {
   try {
-    const messages = await ApiClient.get(`/chats/${chatId}/messages?skip=${skip}&limit=${limit}`);
-    // Преобразуем timestamp в объект Date для каждого сообщения
-    return messages.map((message: any) => ({
-      ...message,
-      timestamp: new Date(message.timestamp)
-    }));
-  } catch (error) {
-    if (error instanceof Error && error.message === 'Not authenticated') {
+    const token = await ApiClient.getAuthToken();
+    
+    if (token) {
+      const response = await ApiClient.get(`/chats/${chatId}/messages?skip=${skip}&limit=${limit}`);
+      return response.map((msg: ApiChatMessage) => ({
+        id: msg.id,
+        role: msg.role,
+        content: msg.content,
+        timestamp: new Date(msg.timestamp),
+        files: msg.files || [], // Ensure files property is always defined
+      }));
+    } else {
+      // Для неавторизованных пользователей - возвращаем пустой массив сообщений,
+      // так как история не сохраняется локально между сессиями
+      return [];
+    }
+  } catch (error: any) {
+    if (error.message?.includes('not authenticated') || error.message?.includes('401')) {
       // console.log(`Cannot fetch messages for chat ${chatId}: User not authenticated.`);
       return []; // Return empty array if not authenticated
     }
@@ -605,86 +725,22 @@ export async function getChatMessages(chatId: number, skip: number = 0, limit: n
   }
 }
 
-// Authenticated endpoint (except potentially for doctor 20)
-export async function createChat(doctorId: number) {
-  try {
-    // console.log(`Creating chat with doctor ID ${doctorId}`);
-    const isDecodeDoctor = doctorId === 20;
-    const token = await ApiClient.getAuthToken();
-
-    if (!token && !isDecodeDoctor) {
-        throw new Error("Требуется авторизация для создания этого чата.");
-    }
-    // Use ApiClient which will handle the token correctly
-    return await ApiClient.post('/chats', { doctor_id: doctorId });
-
-  } catch (error) {
-    console.error(`Error creating chat with doctor ${doctorId}:`, error);
-    throw error;
-  }
-}
-
-// Authenticated endpoint
-export async function uploadChatFiles(chatId: number, files: File[], fileType: 'image' | 'document' = 'image') {
-  try {
-    const formData = new FormData();
-    files.forEach(file => formData.append('files', file));
-    formData.append('file_type', fileType);
-    formData.append('_t', Date.now().toString());
-
-    // Use ApiClient.request which handles token and FormData
-    return await ApiClient.request(`/chats/${chatId}/files`, {
-      method: 'POST',
-      body: formData,
-    });
-  } catch (error) {
-    console.error(`Error uploading files to chat ${chatId}:`, error);
-    throw error;
-  }
-}
-
-// Analyze file (check if authentication is needed)
-// Assuming /files/analyze requires authentication based on your backend
-export async function analyzeFile(file: File): Promise<any> {
-  try {
-    const formData = new FormData();
-    formData.append('file', file);
-    // console.log("DEBUG: Analyzing file:", { fileName: file.name, fileSize: file.size });
-
-    // Use ApiClient.request which handles token and FormData
-    return await ApiClient.request('/files/analyze', {
-        method: 'POST',
-        body: formData
-    });
-  } catch (error) {
-    console.error(`Error analyzing file:`, error);
-    throw error;
-  }
-}
-
-// Analyze multiple files (check if authentication is needed)
-// Assuming /files/bulk-analyze requires authentication
-export async function analyzeMultipleFiles(files: File[]): Promise<any[]> {
-  try {
-    const formData = new FormData();
-    files.forEach(file => formData.append('files', file));
-    // console.log("DEBUG: Analyzing multiple files:", { fileCount: files.length });
-
-    // Use ApiClient.request which handles token and FormData
-    return await ApiClient.request('/files/bulk-analyze', {
-        method: 'POST',
-        body: formData
-    });
-  } catch (error) {
-    console.error(`Error analyzing multiple files:`, error);
-    throw error;
-  }
-}
-
 // Authenticated endpoint
 export async function clearChatHistory(chatId: number) {
   try {
-    return await ApiClient.delete(`/chats/${chatId}`);
+    const token = await ApiClient.getAuthToken();
+    
+    if (token) {
+      return await ApiClient.delete(`/chats/${chatId}`);
+    } else {
+      // Для неавторизованных пользователей просто очищаем localStorage
+      const guestChats = JSON.parse(localStorage.getItem('guest_chats') || '{}');
+      if (guestChats[chatId]) {
+        delete guestChats[chatId];
+        localStorage.setItem('guest_chats', JSON.stringify(guestChats));
+      }
+      return { success: true };
+    }
   } catch (error) {
     console.error(`Error clearing chat history for chat ${chatId}:`, error);
     throw error;
@@ -693,44 +749,50 @@ export async function clearChatHistory(chatId: number) {
 
 // PDF Export (client-side, no API call needed)
 export async function exportChatToPDF(chatContainer: HTMLElement, doctorName: string): Promise<void> {
-   // Keep the existing implementation
-   return new Promise<void>((resolve, reject) => {
-     try {
-       html2canvas(chatContainer, {
-         scale: 1,
-         useCORS: true,
-         allowTaint: true,
-         scrollY: -window.scrollY
-       }).then(canvas => {
-         const imgData = canvas.toDataURL('image/png');
-         const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-         const imgWidth = 210; const pageHeight = 295;
-         const imgHeight = (canvas.height * imgWidth) / canvas.width;
-         let heightLeft = imgHeight; let position = 0;
-         pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-         heightLeft -= pageHeight;
-         while (heightLeft > 0) {
-           position = heightLeft - imgHeight;
-           pdf.addPage();
-           pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-           heightLeft -= pageHeight;
-         }
-         pdf.setProperties({ title: `Чат с ${doctorName}`, subject: 'Медицинская консультация', creator: 'Doctus', author: 'Doctus' });
-         pdf.save(`Чат с ${doctorName}.pdf`);
-         resolve();
-       }).catch(reject); // Catch html2canvas errors
-     } catch (error) {
-       console.error('Error exporting chat to PDF:', error);
-       reject(error);
-     }
-   });
+  // Keep the existing implementation
+  return new Promise<void>((resolve, reject) => {
+    try {
+      html2canvas(chatContainer, {
+        scale: 1,
+        useCORS: true,
+        allowTaint: true,
+        scrollY: -window.scrollY
+      }).then(canvas => {
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const imgWidth = 210; const pageHeight = 295;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        let heightLeft = imgHeight; let position = 0;
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+        while (heightLeft > 0) {
+          position = heightLeft - imgHeight;
+          pdf.addPage();
+          pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+          heightLeft -= pageHeight;
+        }
+        pdf.setProperties({ title: `Чат с ${doctorName}`, subject: 'Медицинская консультация', creator: 'Doctus', author: 'Doctus' });
+        pdf.save(`Чат с ${doctorName}.pdf`);
+        resolve();
+      }).catch(reject); // Catch html2canvas errors
+    } catch (error) {
+      console.error('Error exporting chat to PDF:', error);
+      reject(error);
+    }
+  });
 }
-
 
 // Authenticated endpoint
 export async function searchFiles(query: string, limit: number = 5) {
   try {
-    return await ApiClient.get(`/files/search?query=${encodeURIComponent(query)}&limit=${limit}`);
+    const token = await ApiClient.getAuthToken();
+    
+    if (token) {
+      return await ApiClient.get(`/files/search?query=${encodeURIComponent(query)}&limit=${limit}`);
+    } else {
+      // Для неавторизованных пользователей возвращаем пустой результат
+      return [];
+    }
   } catch (error) {
     console.error(`Error searching files:`, error);
     throw error;
@@ -740,7 +802,14 @@ export async function searchFiles(query: string, limit: number = 5) {
 // Authenticated endpoint
 export async function searchVectorDB(query: string, limit: number = 5) {
   try {
-    return await ApiClient.get(`/files/vector-search?query=${encodeURIComponent(query)}&limit=${limit}`);
+    const token = await ApiClient.getAuthToken();
+    
+    if (token) {
+      return await ApiClient.get(`/files/vector-search?query=${encodeURIComponent(query)}&limit=${limit}`);
+    } else {
+      // Для неавторизованных пользователей возвращаем пустой результат
+      return [];
+    }
   } catch (error) {
     console.error(`Error searching vector DB:`, error);
     throw error;
@@ -759,4 +828,114 @@ export async function createPayment(planId: number, periodMonths: number): Promi
     plan_id: planId,
     period_months: periodMonths
   });
+}
+
+// Authenticated endpoint or for guest users
+export async function uploadChatFiles(chatId: number, files: File[], fileType: 'image' | 'document' = 'image') {
+  try {
+    const token = await ApiClient.getAuthToken();
+    
+    // Если пользователь авторизован, используем API
+    if (token) {
+      const formData = new FormData();
+      files.forEach(file => formData.append('files', file));
+      formData.append('file_type', fileType);
+      formData.append('_t', Date.now().toString());
+
+      // Use ApiClient.request which handles token and FormData
+      return await ApiClient.request(`/chats/${chatId}/files`, {
+        method: 'POST',
+        body: formData,
+      });
+    } else {
+      // Для неавторизованных пользователей - имитируем успешную загрузку файлов
+      const localFiles = files.map((file, index) => {
+        const fileId = `local_file_${Date.now()}_${index}`;
+        // Создаем URL для отображения файла в UI
+        const fileUrl = URL.createObjectURL(file);
+        
+        return {
+          id: fileId,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          url: fileUrl
+        };
+      });
+      
+      return {
+        success: true,
+        files: localFiles
+      };
+    }
+  } catch (error) {
+    console.error(`Error uploading files to chat ${chatId}:`, error);
+    throw error;
+  }
+}
+
+// Analyze file (check if authentication is needed)
+export async function analyzeFile(file: File): Promise<any> {
+  try {
+    const token = await ApiClient.getAuthToken();
+    
+    if (token) {
+      const formData = new FormData();
+      formData.append('file', file);
+      // console.log("DEBUG: Analyzing file:", { fileName: file.name, fileSize: file.size });
+
+      // Use ApiClient.request which handles token and FormData
+      return await ApiClient.request('/files/analyze', {
+          method: 'POST',
+          body: formData
+      });
+    } else {
+      // Для неавторизованных пользователей - имитируем успешный анализ файла
+      // Имитация задержки для реалистичности
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      return {
+        success: true,
+        file_id: `local_analyzed_${Date.now()}`,
+        content: `Содержимое файла ${file.name} успешно проанализировано.`,
+        file_type: file.type.startsWith('image/') ? 'image' : 'document'
+      };
+    }
+  } catch (error) {
+    console.error(`Error analyzing file:`, error);
+    throw error;
+  }
+}
+
+// Analyze multiple files
+export async function analyzeMultipleFiles(files: File[]): Promise<any[]> {
+  try {
+    const token = await ApiClient.getAuthToken();
+    
+    if (token) {
+      const formData = new FormData();
+      files.forEach(file => formData.append('files', file));
+      // console.log("DEBUG: Analyzing multiple files:", { fileCount: files.length });
+
+      // Use ApiClient.request which handles token and FormData
+      return await ApiClient.request('/files/bulk-analyze', {
+          method: 'POST',
+          body: formData
+      });
+    } else {
+      // Для неавторизованных пользователей - имитируем успешный анализ файлов
+      // Имитация задержки для реалистичности
+      await new Promise(resolve => setTimeout(resolve, files.length * 500));
+      
+      return files.map((file, index) => ({
+        success: true,
+        file_id: `local_analyzed_${Date.now()}_${index}`,
+        content: `Содержимое файла ${file.name} успешно проанализировано.`,
+        file_type: file.type.startsWith('image/') ? 'image' : 'document'
+      }));
+    }
+  } catch (error) {
+    console.error(`Error analyzing multiple files:`, error);
+    throw error;
+  }
 }

@@ -6,9 +6,10 @@ import { getDoctors, getChatMessages, getUserChats } from "../../lib/api";
 import { Message } from "../../lib/types";
 import { DoctorList } from "../../components/doctors/doctor-list";
 import { ChatWindow } from "../../components/chat/chat-window";
-import { MenuIcon, User } from "lucide-react";
+import { MenuIcon, User, Stethoscope, Upload, Camera, MessageSquare } from "lucide-react";
 import { PricingModal } from "../../components/pricing/pricing-modal";
 import { useAuth } from "@/lib/auth-context";
+import { useMessageLimit } from '@/lib/message-limit-context';
 
 interface DoctorChatProps {
   initialDoctorId?: string | number;
@@ -23,7 +24,18 @@ export function DoctorChat({ initialDoctorId }: DoctorChatProps = {}) {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [historyAttempted, setHistoryAttempted] = useState<Record<string, boolean>>({});
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const { messagesCount, messagesLimit } = useMessageLimit();
+  
+  // Проверяем авторизацию
+  const isAuthenticated = !!token;
+  // Проверяем активную подписку
+  const hasActiveSubscription = !!user?.subscription?.is_active;
+  
+  // Вычисляем оставшиеся сообщения, ТОЛЬКО если НЕТ подписки
+  const remainingMessages = !hasActiveSubscription
+    ? Math.max(0, messagesLimit - messagesCount)
+    : null; // Если есть подписка, лимита нет (null)
   
   // Загрузка докторов из API
   useEffect(() => {
@@ -202,39 +214,70 @@ export function DoctorChat({ initialDoctorId }: DoctorChatProps = {}) {
         />
       </div>
       
-      {/* Chat window */}
-      <div className="flex-1 h-full flex flex-col">
-        {/* Mobile header - integrated inside chat window */}
-        <div className="md:hidden border-b p-4 flex items-center justify-between bg-background z-30">
-          <div className="flex items-center">
-            <button 
-              type="button"
-              className="p-2 mr-3 rounded-full hover:bg-muted"
-              onClick={() => setIsMobileMenuOpen(true)}
-            >
-              <MenuIcon className="h-5 w-5" />
-            </button>
-            <h2 className="text-xl font-bold">
-              {selectedDoctor && typeof selectedDoctor === 'object' ? `Чат с ${selectedDoctor.name}` : "ИИ Врачи"}
-            </h2>
+      {/* Основная часть окна чата */}
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Информация о лимите сообщений показывается ТОЛЬКО если НЕТ подписки */}
+        {!hasActiveSubscription && (
+          <div className="bg-blue-50 p-2 text-center text-sm text-blue-800 border-b">
+            {remainingMessages !== null && remainingMessages > 0 ? (
+              // Текст для тех, у кого остались сообщения
+              <>Осталось {remainingMessages} бесплатных сообщений. {isAuthenticated ? <a href="/tariffs" className="text-blue-600 underline">Оформить подписку</a> : <><a href="/auth/login" className="text-blue-600 underline">Войдите</a> или <a href="/auth/register" className="text-blue-600 underline">зарегистрируйтесь</a></>} для безлимитного доступа.</>
+            ) : (
+              // Текст для тех, у кого закончились сообщения
+              <>Вы использовали все бесплатные сообщения. {isAuthenticated ? <a href="/tariffs" className="text-blue-600 underline">Оформить подписку</a> : <><a href="/auth/login" className="text-blue-600 underline">Войдите</a> или <a href="/auth/register" className="text-blue-600 underline">зарегистрируйтесь</a></>} для продолжения.</>
+            )}
           </div>
-          
-        </div>
+        )}
         
-        <div className="flex-1 overflow-auto">
-          {isLoadingHistory ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        {/* Отображаем компонент чата */}
+        {selectedDoctor ? (
+          <ChatWindow
+            doctor={selectedDoctor}
+            messages={currentMessages}
+            setMessages={setCurrentMessages}
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+              <Stethoscope className="w-8 h-8 text-blue-500" />
             </div>
-          ) : (
-            <ChatWindow 
-              doctor={selectedDoctor}
-              messages={currentMessages}
-              setMessages={setCurrentMessages}
-            />
-          )}
-        </div>
+            <h3 className="text-lg font-semibold text-gray-900">Выберите доктора для начала консультации</h3>
+            <p className="text-sm text-gray-500 max-w-md">Выберите специалиста из списка слева, чтобы задать вопрос или проконсультироваться</p>
+            <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-gray-600">
+              <div className="flex items-center gap-2">
+                <Upload className="w-5 h-5 text-blue-500" /> 
+                Прикрепляйте файлы
+              </div>
+              <div className="flex items-center gap-2">
+                <Camera className="w-5 h-5 text-blue-500" /> 
+                Делайте фото
+              </div>
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-blue-500" /> 
+                Задавайте вопросы
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+      
+      {/* Мобильная кнопка меню */}
+      <button
+        className="md:hidden absolute left-4 top-4 z-30 bg-background p-2 rounded-md"
+        onClick={() => setIsMobileMenuOpen(true)}
+      >
+        <MenuIcon className="w-6 h-6" />
+      </button>
+      
+      {/* Модальное окно с тарифами */}
+      <PricingModal 
+        isOpen={isPricingModalOpen}
+        onClose={() => setIsPricingModalOpen(false)}
+        subscription={null}
+        onSubscribe={async () => {
+          setIsPricingModalOpen(false);
+        }}
+      />
       
       {/* Overlay for mobile menu */}
       {isMobileMenuOpen && (
@@ -243,14 +286,6 @@ export function DoctorChat({ initialDoctorId }: DoctorChatProps = {}) {
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
-      
-      {/* Pricing Modal */}
-      <PricingModal 
-        isOpen={isPricingModalOpen} 
-        onClose={() => setIsPricingModalOpen(false)} 
-        subscription={null}
-        onSubscribe={async () => {}}
-      />
     </div>
   );
 }

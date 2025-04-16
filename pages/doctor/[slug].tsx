@@ -6,6 +6,12 @@ import { useRouter } from 'next/router';
 import { DoctorChat } from '../../components/chat/doctor-chat';
 import { getDoctorBySlug } from '@/lib/api';
 import { Doctor } from '@/lib/doctors';
+import CapabilitiesSection from '../../components/ui/CapabilitiesSection';
+import DoctorsSection from '../../components/ui/DoctorsSection';
+import FAQSection from '../../components/ui/FAQSection';
+import BlogSection from '../../components/ui/BlogSection';
+import LabsSection from '../../components/ui/LabsSection';
+import CTASection from '../../components/ui/CTASection';
 
 export default function DoctorPage() {
   const router = useRouter();
@@ -118,6 +124,20 @@ export default function DoctorPage() {
           </div>
         </div>
       </section>
+
+      <CapabilitiesSection />
+
+      <DoctorsSection />
+
+      <FAQSection />
+
+      <BlogSection />
+
+      <LabsSection />
+
+      <CTASection />
+
+      {/* Следующая секция: CTA */}
     </>
   );
 } 

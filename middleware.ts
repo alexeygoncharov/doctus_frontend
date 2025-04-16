@@ -5,7 +5,7 @@ import { getToken } from 'next-auth/jwt';
 const secret = process.env.NEXTAUTH_SECRET;
 
 // Define paths that require authentication
-const protectedPaths = ['/settings', '/analysis', '/plans']; // Add other paths as needed
+const protectedPaths = ['/settings']; // Удалено '/plans'
 
 // Define paths that should redirect authenticated users away
 const authPaths = ['/auth/login', '/auth/register'];
@@ -69,8 +69,6 @@ export const config = {
   matcher: [
     // Apply middleware to all protected paths and auth paths
     '/settings/:path*',
-    '/analysis/:path*',
-    '/plans/:path*',
     '/auth/login',
     '/auth/register',
     // Add root ('/') if you want to redirect logged-in users from the landing page
