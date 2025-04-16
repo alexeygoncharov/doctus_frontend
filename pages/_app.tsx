@@ -36,6 +36,7 @@ export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
   const isAuthPage = router.pathname.startsWith('/auth/');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [localAvatarUrl, setLocalAvatarUrl] = useState<string | null>(null);
   
   // Инициализация аватара из localStorage (можно оставить)
   useEffect(() => {

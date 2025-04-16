@@ -119,7 +119,7 @@ export const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
   // Debug - console log if message has processing flag
   useEffect(() => {
     if (message.processingFiles) {
-      console.log('Message has processingFiles flag:', message.id, message.processingStatus);
+      // console.log('Message has processingFiles flag:', message.id, message.processingStatus);
     }
   }, [message.processingFiles, message.processingStatus, message.id]);
   
@@ -188,7 +188,7 @@ export const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
     
         Promise.all(cachePromises).then(updatedFiles => {
           if (isMounted) {
-            console.log('Image caching process completed.');
+            // console.log('Image caching process completed.');
             // Force re-render if necessary, e.g., if relying on file.cached_data in ImageMessage
             // This might require managing files in component state instead of direct mutation
           }
@@ -366,7 +366,7 @@ export const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
       {isUser && (
          <div className="relative h-8 w-8 sm:h-10 sm:w-10 shrink-0">
            <SimpleAvatar
-             src={user?.avatar || avatarUrl || undefined}
+             src={message.userAvatar || user?.avatar || avatarUrl || undefined}
              alt="User"
              fallbackText={user?.name ? user.name.charAt(0) : 'U'}
              className="h-full w-full"

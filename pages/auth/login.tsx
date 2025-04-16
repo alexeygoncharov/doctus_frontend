@@ -31,57 +31,41 @@ const LoginPage = () => {
     setIsLoading(true);
 
     try {
-      console.log('Attempting login with credentials', { email });
+      const callbackUrl = router.query.callbackUrl as string | undefined;
+      const returnUrl = router.query.returnUrl as string | undefined;
+      let redirectTo = callbackUrl || returnUrl || '/'; // Default to home page
       
-      // Получаем URL для перенаправления после успешного входа
-      const redirectTo = (callbackUrl || returnUrl || '/') as string;
-      console.log('Redirect URL after login:', redirectTo);
+      // Ensure redirect is within the application to prevent open redirect vulnerabilities
+      if (!redirectTo.startsWith('/')) {
+        redirectTo = '/'; 
+      }
       
       const result = await signIn('credentials', {
-        redirect: false,
+        redirect: false, // Handle redirect manually after checking result
         email,
         password,
-        callbackUrl: redirectTo
-      });
-
-      console.log('SignIn result:', { 
-        ok: result?.ok, 
-        error: result?.error,
-        url: result?.url,
-        status: result?.status
+        callbackUrl: redirectTo, // Pass the final intended redirect URL
       });
 
       if (result?.error) {
-        // Map specific error messages if needed
-        let displayError = 'Неверный email или пароль';
-        
-        if (result.error === 'RefreshAccessTokenError') {
-          displayError = 'Сессия устарела. Пожалуйста, войдите снова.';
+        let errorMessage = 'Неправильный email или пароль.';
+        // Check for specific error messages if your backend provides them
+        if (result.error === 'CredentialsSignin' || result.error.includes('Неправильный email или пароль')) {
+          // Default message is fine
+        } else {
+          errorMessage = result.error; // Use the error message from the backend/authorize
         }
-        
-        setErrorMsg(displayError);
-        console.error('Ошибка входа:', result.error);
+        setErrorMsg(errorMessage);
+        setIsLoading(false);
       } else if (result?.ok) {
-        // Успешная авторизация, ждем короткую задержку для гарантии инициализации сессии
-        console.log('Login successful, redirecting after delay for session init');
-        
-        // Используем url из результата, если он есть, иначе fallback
-        const redirectTarget = result?.url || redirectTo || '/';
-        console.log('Will redirect to:', redirectTarget);
-        
-        // Небольшая задержка, чтобы дать NextAuth время обновить сессию
-        setTimeout(() => {
-          router.push(redirectTarget);
-        }, 500);
+        const redirectTarget = result.url || redirectTo;
+        router.push(redirectTarget);
       } else {
-        // Непредвиденная ситуация - есть результат, но нет ни ошибки, ни признака успеха
-        console.warn('Unexpected result from signIn:', result);
-        setErrorMsg('Произошла непредвиденная ошибка при входе');
+        setErrorMsg('Произошла неизвестная ошибка при входе.');
+        setIsLoading(false);
       }
     } catch (error) {
-      console.error('Ошибка авторизации:', error);
-      setErrorMsg('Произошла ошибка при входе в систему');
-    } finally {
+      setErrorMsg(error instanceof Error ? error.message : 'Произошла ошибка при попытке входа.');
       setIsLoading(false);
     }
   };

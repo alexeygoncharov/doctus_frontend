@@ -28,9 +28,9 @@ export function ImageMessage({ images, processingStatus }: ImageMessageProps) {
   const [error, setError] = useState(false);
   
   // Log when processing status changes
-  useEffect(() => {
-    console.log('ImageMessage processing status:', processingStatus);
-  }, [processingStatus]);
+  if (processingStatus) {
+    // console.log('ImageMessage processing status:', processingStatus);
+  }
   
   // Statuses to cycle through during processing
   const processingStatuses = [

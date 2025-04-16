@@ -25,13 +25,13 @@ export function FileMessage({ file }: FileMessageProps) {
   // Remove debug logging in production
   // Only log in development environment
   if (process.env.NODE_ENV === 'development') {
-    console.log("FILE MESSAGE DEBUG:", {
-      fileName: file.name,
-      fileSize: file.size,
-      fileType: file.type,
-      fileUrl: file.url,
-      fileExtension
-    });
+    // console.log("FILE MESSAGE DEBUG:", {
+    //   fileName: file.name,
+    //   fileSize: file.size,
+    //   fileType: file.type,
+    //   fileUrl: file.url,
+    //   fileExtension
+    // });
   }
   
   // Create a persistent URL for the file without cache-busting

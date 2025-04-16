@@ -5,7 +5,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 
 // Ensure backend URL is set
 const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend.doctus.chat';
-console.log('Using backend URL:', backendUrl); // Logging for debugging
+// console.log('Using backend URL:', backendUrl); // Logging for debugging
 if (!backendUrl) {
   throw new Error('Environment variable NEXT_PUBLIC_API_URL or NEXT_AUTH_BACKEND_URL must be set');
 }
@@ -69,7 +69,7 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
     */
 
     // --- Placeholder if refresh logic is not implemented --- 
-    console.warn('Refresh token logic not implemented in [...nextauth].ts. Returning token with error.');
+    // console.warn('Refresh token logic not implemented in [...nextauth].ts. Returning token with error.');
     return {
       ...token,
       error: 'RefreshAccessTokenNotImplemented', // Indicate refresh is needed but not implemented
@@ -100,11 +100,11 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials): Promise<NextAuthUser | null> {
         if (!credentials?.email || !credentials?.password) {
-          console.log('Authorize: Missing credentials');
+          // console.log('Authorize: Missing credentials');
           return null;
         }
 
-        console.log(`Authorize: Attempting login for ${credentials.email}`);
+        // console.log(`Authorize: Attempting login for ${credentials.email}`);
         try {
           // 1. Get Access Token from /auth/token
           const tokenResponse = await fetch(`${backendUrl}/auth/token`, {
@@ -131,13 +131,13 @@ export const authOptions: NextAuthOptions = {
 
           const tokenData = await tokenResponse.json();
           if (!tokenData.access_token) {
-            console.error(`Authorize: access_token missing from /auth/token response for ${credentials.email}`);
+            // console.error(`Authorize: access_token missing from /auth/token response for ${credentials.email}`);
             throw new Error('Authentication failed: No access token received.');
           }
-          console.log(`Authorize: Token received for ${credentials.email}`);
+          // console.log(`Authorize: Token received for ${credentials.email}`);
 
           // 2. Get User Details from /auth/me
-          console.log(`Authorize: Fetching user details from ${backendUrl}/auth/me`);
+          // console.log(`Authorize: Fetching user details from ${backendUrl}/auth/me`);
           const userResponse = await fetch(`${backendUrl}/auth/me`, {
              headers: { Authorization: `Bearer ${tokenData.access_token}` },
           });
@@ -150,10 +150,10 @@ export const authOptions: NextAuthOptions = {
           }
 
           const backendUserData: BackendUser = await userResponse.json();
-          console.log(`Authorize: User details received for ${credentials.email}`, backendUserData);
+          // console.log(`Authorize: User details received for ${credentials.email}`, backendUserData);
 
           if (!backendUserData.id) {
-            console.error(`Authorize: User ID missing from /auth/me response for ${credentials.email}`);
+            // console.error(`Authorize: User ID missing from /auth/me response for ${credentials.email}`);
             throw new Error('User identification failed after login.');
           }
 
@@ -166,7 +166,7 @@ export const authOptions: NextAuthOptions = {
              accessTokenExpires: (Date.now() + (tokenData.expires_in || 3600) * 1000),
              backendUser: backendUserData,
            };
-           console.log(`Authorize: Success for ${credentials.email}. User ID: ${authorizeUser.id}`);
+           // console.log(`Authorize: Success for ${credentials.email}. User ID: ${authorizeUser.id}`);
            return authorizeUser as any;
 
         } catch (error) {
@@ -206,13 +206,13 @@ export const authOptions: NextAuthOptions = {
          const authorizeUser = user as any; // Use `as any` here
          
          // Debug logging to see what we're getting from authorizeUser
-         console.log('JWT callback - authorizeUser:', {
-           id: authorizeUser.id,
-           email: authorizeUser.email,
-           name: authorizeUser.name,
-           accessToken: !!authorizeUser.accessToken,
-           backendUser: authorizeUser.backendUser ? Object.keys(authorizeUser.backendUser) : null
-         });
+         // console.log('JWT callback - authorizeUser:', {
+         //   id: authorizeUser.id,
+         //   email: authorizeUser.email,
+         //   name: authorizeUser.name,
+         //   accessToken: !!authorizeUser.accessToken,
+         //   backendUser: authorizeUser.backendUser ? Object.keys(authorizeUser.backendUser) : null
+         // });
          
          token.accessToken = authorizeUser.accessToken;
          token.accessTokenExpires = authorizeUser.accessTokenExpires;
@@ -222,7 +222,7 @@ export const authOptions: NextAuthOptions = {
          
          // Ensure avatar is correctly stored from backendUser
          const avatar = authorizeUser.backendUser?.avatar;
-         console.log('JWT callback - backendUser avatar:', avatar);
+         // console.log('JWT callback - backendUser avatar:', avatar);
          
          token.user = { // Populate user details in token
               id: authorizeUser.id,
@@ -232,12 +232,12 @@ export const authOptions: NextAuthOptions = {
               role: authorizeUser.backendUser?.role,
           };
           
-          console.log('JWT callback - token user set:', { 
-            id: token.user.id, 
-            email: token.user.email,
-            name: token.user.name,
-            avatar: token.user.avatar
-          });
+          // console.log('JWT callback - token user set:', { 
+          //   id: token.user.id, 
+          //   email: token.user.email,
+          //   name: token.user.name,
+          //   avatar: token.user.avatar
+          // });
           
           return token;
        }
@@ -245,27 +245,27 @@ export const authOptions: NextAuthOptions = {
       // **Subsequent calls: Check expiry**
       if (token.accessTokenExpires && Date.now() < (token.accessTokenExpires as number)) {
         // Log for debugging
-        console.log('JWT callback - Using existing valid token');
+        // console.log('JWT callback - Using existing valid token');
         return token; // Token still valid
       }
 
       // **Refresh token logic (if implemented)**
       // return refreshAccessToken(token);
-      console.warn("JWT Callback: Token expired or invalid, refresh logic not implemented.");
+      // console.warn("JWT Callback: Token expired or invalid, refresh logic not implemented.");
       return { ...token, error: "RefreshAccessTokenError" };
     },
 
     async session({ session, token }): Promise<Session> {
-      console.log('Session callback - token:', { 
-        sub: token.sub,
-        accessToken: !!token.accessToken,
-        user: token.user ? {
-          id: token.user.id,
-          email: token.user.email,
-          name: token.user.name,
-          avatar: token.user.avatar
-        } : null
-      });
+      // console.log('Session callback - token:', { 
+      //   sub: token.sub,
+      //   accessToken: !!token.accessToken,
+      //   user: token.user ? {
+      //     id: token.user.id,
+      //     email: token.user.email,
+      //     name: token.user.name,
+      //     avatar: token.user.avatar
+      //   } : null
+      // });
       
       // Copy required fields from token to session
       session.accessToken = token.accessToken;
@@ -283,12 +283,12 @@ export const authOptions: NextAuthOptions = {
       };
       
       // Log for debugging
-      console.log('Session callback - session user set:', { 
-        id: session.user.id, 
-        email: session.user.email,
-        name: session.user.name,
-        avatar: session.user.avatar
-      });
+      // console.log('Session callback - session user set:', { 
+      //   id: session.user.id, 
+      //   email: session.user.email,
+      //   name: session.user.name,
+      //   avatar: session.user.avatar
+      // });
 
       return session;
     },

@@ -225,10 +225,10 @@ const EmptyChatState = ({
               onChange={() => {
                 // Обрабатываем загрузку файла без фокусировки на input
                 if (fileInputRef.current?.files?.length) {
-                  console.log("DEBUG: File upload triggered", {
-                    fileCount: fileInputRef.current.files.length,
-                    files: Array.from(fileInputRef.current.files).map(f => ({ name: f.name, type: f.type, size: f.size }))
-                  });
+                  // console.log("DEBUG: File upload triggered", {
+                  //   fileCount: fileInputRef.current.files.length,
+                  //   files: Array.from(fileInputRef.current.files).map(f => ({ name: f.name, type: f.type, size: f.size }))
+                  // });
                   setTimeout(() => { handleSendMessage?.(); }, 10); // Добавлен ?. для безопасности
                 }
               }}
@@ -323,22 +323,50 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
   // Debug chat history messages with files
   useEffect(() => {
     if (messages.some(msg => msg.files && msg.files.length > 0)) { // Исправлено: Более безопасная проверка
-      console.log("CHAT HISTORY DEBUG - Messages with files:", 
-        messages.filter(msg => msg.files && msg.files.length > 0).map(msg => ({ // Исправлено: Более безопасная проверка
-          id: msg.id,
-          role: msg.role,
-          content: msg.content.substring(0, 30) + "...",
-          files: msg.files?.map(f => ({
-            name: f.name,
-            size: f.size,
-            type: f.type,
-            url: f.url
-          }))
-        }))
-      );
+      // console.log("CHAT HISTORY DEBUG - Messages with files:", 
+      //   messages.filter(msg => msg.files && msg.files.length > 0).map(msg => ({ // Исправлено: Более безопасная проверка
+      //     id: msg.id,
+      //     role: msg.role,
+      //     content: msg.content.substring(0, 30) + "...",
+      //     files: msg.files?.map(f => ({
+      //       name: f.name,
+      //       size: f.size,
+      //       type: f.type,
+      //       url: f.url
+      //     }))
+      //   }))
+      // );
     }
   }, [messages]);
   
+  useEffect(() => {
+    if (!chatId || messages.length > 0 || isLoadingHistory) return;
+    
+    const fetchMessages = async () => {
+      setIsLoadingHistory(true);
+      try {
+        const chatMessagesData = await getChatMessages(chatId);
+        // console.log("CHAT HISTORY DEBUG - Messages with files:", 
+        //   chatMessagesData.filter(msg => msg.files?.length > 0).map(m => ({ 
+        //     id: m.id, 
+        //     files: m.files?.map(f => ({ id: f.id, fileName: f.fileName, type: f.type })) 
+        //   }))
+        // );
+        setMessages(chatMessagesData);
+        
+        // Прокручиваем к последнему сообщению при загрузке истории
+        setTimeout(() => {
+          scrollToBottom();
+        }, 100);
+      } catch (error) {
+        console.error('Error fetching chat messages:', error);
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+
+    fetchMessages();
+  }, [chatId, messages.length, isLoadingHistory]);
 
   const handleSendMessage = async () => {
     if ((!input.trim() && !fileInputRef.current?.files?.length) || !doctor) return;
@@ -349,7 +377,8 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
     
     // Проверяем авторизацию (кроме доктора "Расшифровка")
     if (!token && !isDecodeDoctor) {
-      alert("Пожалуйста, авторизуйтесь для отправки сообщений");
+      // console.log('DEBUG: User data from useAuth in handleSendMessage:', user);
+      toast.error("Пожалуйста, войдите в систему для отправки сообщений");
       setIsLoading(false);
       return;
     }
@@ -365,6 +394,7 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
     }
     
     // Get user avatar from session
+    // console.log('DEBUG: User data from useAuth in handleSendMessage:', user);
     const userAvatar = user?.avatar || undefined;
     
     const userMessage: Message = {
@@ -462,7 +492,7 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
               // Для оптимизации сначала попробуем проанализировать файлы
               // для извлечения текста и создания векторного представления
               const analyzedFiles = await analyzeMultipleFiles(files);
-              console.log('Files analyzed successfully:', analyzedFiles);
+              // console.log('Files analyzed successfully:', analyzedFiles);
               
               // Затем загружаем файлы в чат
               const response = await uploadChatFiles(
@@ -480,9 +510,9 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
               
               // Если не удалось проанализировать файлы, попробуем просто загрузить их в чат
               try {
-                console.log(`Fallback upload attempt: Using explicit file type: ${fileType} for files:`, 
-                  files.map(f => ({name: f.name, type: f.type}))
-                );
+                // console.log(`Fallback upload attempt: Using explicit file type: ${fileType} for files:`, 
+                //   Array.from(files).map(f => ({ name: f.name, type: f.type, size: f.size }))
+                // );
                 
                 const response = await uploadChatFiles(
                   currentChatId, 
@@ -640,16 +670,16 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
             
             // Сначала анализируем файлы для извлечения текста и создания векторного представления
             try {
-              console.log(`Analyzing ${filesArray.length} files. Types:`, 
-                filesArray.map(f => ({ 
-                  name: f.name, 
-                  type: f.type, 
-                  size: f.size,
-                  extension: f.name.split('.').pop()?.toLowerCase() 
-                }))
-              );
+              // console.log(`Analyzing ${filesArray.length} files. Types:`, 
+              //   Array.from(filesArray).map(f => ({ 
+              //     name: f.name, 
+              //     type: f.type, 
+              //     size: f.size,
+              //     extension: f.name.split('.').pop()?.toLowerCase() 
+              //   }))
+              // );
               const analyzedFiles = await analyzeMultipleFiles(filesArray);
-              console.log('Files analyzed successfully:', analyzedFiles);
+              // console.log('Files analyzed successfully:', analyzedFiles);
             } catch (analyzeError) {
               console.error('Error analyzing files:', analyzeError);
               // Продолжаем выполнение, даже если анализ не удался
@@ -663,26 +693,16 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
             ));
             
             // Загружаем файлы в чат и получаем их идентификаторы
-            console.log(`Uploading ${filesArray.length} files to chat ${currentChatId} as ${fileType}. File info:`, 
-                filesArray.map(f => ({
-                  name: f.name,
-                  type: f.type,
-                  size: f.size,
-                  extension: f.name.split('.').pop()?.toLowerCase()
-                }))
-            );
-            
-            // Явно передаем тип файла, учитывая его расширение
             const uploadResponse = await uploadChatFiles(currentChatId, filesArray, fileType);
-            console.log('Files uploaded successfully:', uploadResponse);
+            // console.log('Files uploaded successfully:', uploadResponse);
             
             if (!uploadResponse || !uploadResponse.files || uploadResponse.files.length === 0) {
               console.error('Warning: No files returned in upload response. This may cause issues with file processing!');
             } else {
-              console.log(`Successfully received ${uploadResponse.files.length} file references from server`);
+              // console.log(`Successfully received ${uploadResponse.files.length} file references from server`);
             }
             
-            console.log('Message with processing status:', userMessage);
+            // console.log('Message with processing status:', userMessage);
             
             // Обновляем статус обработки
             setMessages(messages => messages.map(msg => 
@@ -693,7 +713,7 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
             
             // Извлекаем идентификаторы загруженных файлов для передачи в сообщение
             const fileIds = uploadResponse.files?.map((file: any) => file.id) || []; // Исправлено: Используем any временно (Line 917)
-            console.log('File IDs to attach:', fileIds);
+            // console.log('File IDs to attach:', fileIds);
             
             // Отправляем сообщение с описанием файлов
             // Разные подсказки для разных типов файлов
@@ -850,7 +870,7 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
             // Сначала анализируем файлы для извлечения текста и создания векторного представления
             try {
               const analyzedFiles = await analyzeMultipleFiles(files);
-              console.log('Camera images analyzed successfully:', analyzedFiles);
+              // console.log('Camera images analyzed successfully:', analyzedFiles);
             } catch (analyzeError) {
               console.error('Error analyzing camera images:', analyzeError);
               // Продолжаем выполнение, даже если анализ не удался
@@ -865,7 +885,7 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
             
             // Загружаем файлы в чат и получаем их идентификаторы
             const uploadResponse = await uploadChatFiles(currentChatId, files, 'image');
-            console.log('Files uploaded successfully:', uploadResponse);
+            // console.log('Files uploaded successfully:', uploadResponse);
             
             // Обновляем статус обработки
             setMessages(messages => messages.map(msg => 
@@ -876,7 +896,7 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
             
             // Извлекаем идентификаторы загруженных файлов для передачи в сообщение
             const fileIds = uploadResponse.files?.map((file: any) => file.id) || []; // Исправлено: Используем any временно (Line 1097)
-            console.log('File IDs to attach:', fileIds);
+            // console.log('File IDs to attach:', fileIds);
             
             // Отправляем сообщение с описанием изображений
             const imageDescription = capturedImages.length > 1 
@@ -928,43 +948,35 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
   
   // Обработчик очистки истории чата и векторных эмбеддингов
   const handleClearChatHistory = async () => {
-    if (!chatId) return;
+    // console.log('handleClearChatHistory called. Current chatId:', chatId);
     
-    if (window.confirm('Вы уверены, что хотите очистить историю чата? Это удалит все сообщения и файлы. Действие нельзя отменить.')) {
-      try {
-        setIsLoading(true);
-        
-        // Очищаем чат на сервере (включая векторные эмбеддинги и файлы)
-        await clearChatHistory(chatId);
-        
-        // Очищаем локальное состояние
-        setMessages([]);
-        setChatMenuOpen(false);
-        
-        // Сбрасываем идентификатор чата, чтобы создать новый при следующем сообщении
-        setChatId(null);
-        
-        // Сбрасываем флаг загрузки истории, чтобы пометить что для этого доктора история снова не загружена
-        if (doctor && doctor.id) {
-          setHistoryAttempted(prev => {
-            const result = {...prev};
-            // Удаляем запись для текущего доктора, чтобы точно сбросить историю
-            delete result[doctor.id.toString()];
-            return result;
-          });
-        }
-        
-        // Показываем пользователю уведомление
-        alert('История чата успешно очищена. Предыдущая информация больше не будет влиять на ответы.');
-        
-        // После очистки просто возвращаемся к начальному состоянию
-        // без перезагрузки страницы, чтобы сохранить состояние UI
-      } catch (error) {
-        console.error('Error clearing chat history:', error);
-        alert('Произошла ошибка при очистке истории чата');
-      } finally {
-        setIsLoading(false);
-      }
+    if (!chatId) {
+      // console.log('Clear history cancelled: chatId is null or undefined.');
+      return;
+    }
+    
+    const userConfirmed = window.confirm("Вы уверены, что хотите очистить историю чата? Это действие нельзя отменить.");
+    
+    if (!userConfirmed) return;
+    
+    // console.log('User confirmed clearing history.');
+    
+    try {
+      setIsLoading(true);
+      // console.log(`Attempting to clear chat history for chatId: ${chatId}`);
+      
+      await clearChatHistory(chatId);
+      // console.log('Chat history cleared successfully on server.');
+      
+      // Очищаем локальную историю сообщений
+      setMessages([]);
+      
+      toast.success("История чата была успешно удалена");
+    } catch (error) {
+      console.error("Ошибка при очистке истории чата:", error);
+      toast.error("Не удалось очистить историю чата");
+    } finally {
+      setIsLoading(false);
     }
   };
   
@@ -1230,7 +1242,7 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
               className="flex items-center space-x-2 w-full"
               onSubmit={(e) => {
                 e.preventDefault();
-                if (input.trim() && !isLoading) {
+                if (input && !isLoading) {
                   handleSendMessage();
                 }
               }}
@@ -1280,7 +1292,8 @@ export function ChatWindow({ doctor, messages, setMessages }: ChatWindowProps) {
               <button 
                 className="h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-full bg-blue-500 text-white disabled:opacity-50" 
                 disabled={!input || !input.trim()}
-                onClick={() => {
+                onClick={(e) => {
+                  e.preventDefault();
                   if (input && input.trim()) {
                     handleSendMessage();
                   }

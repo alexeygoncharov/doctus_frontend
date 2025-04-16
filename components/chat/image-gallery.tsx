@@ -84,25 +84,20 @@ export function ImageGallery({ images, initialIndex, isOpen, onClose }: ImageGal
               // Try to load the same image with a cache-busting timestamp
               const originalUrl = images[currentIndex].url.split('?')[0];
               const timestampUrl = `${originalUrl}?t=${Date.now()}`;
-              console.log("Trying with cache-busting URL:", timestampUrl);
+              
+              // console.log("Trying with cache-busting URL:", timestampUrl);
               target.src = timestampUrl;
               
-              // Add a second error handler
+              // Не используем async/await, а вместо этого устанавливаем src напрямую
+              
+              // Если это не сработает, установим еще один обработчик ошибок
               target.onerror = () => {
-                console.error("Failed to load image with timestamp:", timestampUrl);
-                target.onerror = null; // Prevent infinite loops
-                
-                // Try to load from backup location if available
-                if (images[currentIndex].url.includes('/uploads/chat_')) {
-                  const chatId = images[currentIndex].url.match(/\/chat_(\d+)\//)?.[1];
-                  if (chatId) {
-                    const backupUrl = images[currentIndex].url.replace(
-                      /\/uploads\/chat_\d+\//, 
-                      `/uploads/backup_chat_${chatId}/`
-                    );
-                    console.log("Trying backup URL:", backupUrl);
-                    target.src = backupUrl;
-                  }
+                // Попытка загрузки резервного URL (через /uploads/ если исходный был через API)
+                if (images[currentIndex].url.includes('/api/')) {
+                  const backupUrl = images[currentIndex].url.replace('/api/', '/uploads/');
+                  
+                  // console.log("Trying backup URL:", backupUrl);
+                  target.src = backupUrl;
                 }
               };
             }}

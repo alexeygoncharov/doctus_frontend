@@ -8,6 +8,7 @@ import { User, X } from "lucide-react";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { SearchDoctors } from "./search-doctors";
 import { SimpleAvatar } from "@/components/ui/SimpleAvatar";
+import { PlusBadge } from "./plus-badge";
 
 interface DoctorListProps {
   onSelectDoctor: (doctor: Doctor) => void;
@@ -113,6 +114,7 @@ export function DoctorList({
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-medium truncate">{doctor.name}</p>
+                      {doctor.isPremium && <PlusBadge />}
                     </div>
                     <p className="text-xs truncate text-gray-500">{doctor.specialty}</p>
                   </div>

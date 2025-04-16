@@ -45,43 +45,32 @@ const SERVER_URL = API_URL;
 
 // Helper to get full URL for backend resources
 export function getBackendUrl(path: string | null | undefined): string {
-  console.log('==== ОТЛАДКА getBackendUrl ====');
-  console.log('Input path:', path);
-  
+
   const SERVER_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend.doctus.chat';
 
   // Handle empty/null value
   if (!path) {
-    console.log('Path is null or undefined, returning empty string');
-    console.log('==== КОНЕЦ ОТЛАДКИ getBackendUrl ====');
     return ''; 
   }
   
   // Already a full URL but points to localhost
   if (path.startsWith('http://localhost')) {
     const relativePath = path.includes('/uploads/') ? path.split('/uploads/')[1] : path;
-    console.log('Converting localhost path to backend path:', `${SERVER_URL}/uploads/${relativePath}`);
     return path.includes('/uploads/') ? `${SERVER_URL}/uploads/${relativePath}` : path;
   }
   
   // Already a full URL
   if (path.startsWith('http://') || path.startsWith('https://')) {
-    console.log('Path already starts with http/https, returning as is');
-    console.log('==== КОНЕЦ ОТЛАДКИ getBackendUrl ====');
     return path;
   }
   
   // Handle data URLs (for embedded images)
   if (path.startsWith('data:')) {
-    console.log('Path is a data URL, returning as is');
-    console.log('==== КОНЕЦ ОТЛАДКИ getBackendUrl ====');
     return path;
   }
 
   // Если путь начинается с /avatars/, то это локальное изображение из папки public
   if (path.startsWith('/avatars/')) {
-    console.log('Path is a local avatar, returning as is');
-    console.log('==== КОНЕЦ ОТЛАДКИ getBackendUrl ====');
     return path;
   }
 
@@ -95,9 +84,6 @@ export function getBackendUrl(path: string | null | undefined): string {
   
   // Construct full URL
   const fullUrl = `${SERVER_URL}${correctedPath}`;
-  console.log('Corrected path:', correctedPath);
-  console.log('Full URL constructed:', fullUrl);
-  console.log('==== КОНЕЦ ОТЛАДКИ getBackendUrl ====');
   
   return fullUrl;
 }
@@ -241,7 +227,6 @@ export class ApiClient {
 // --- User Functions (using updated ApiClient) ---
 
 export async function getMyProfile(): Promise<UserProfile> {
-  console.log(`Fetching current user profile from ${API_URL}/auth/me`);
   // Assuming /auth/me returns the UserProfile structure
   return ApiClient.get('/auth/me');
 }
@@ -254,7 +239,7 @@ export async function getUserProfile(userId: string | number): Promise<UserProfi
 
 
 export async function updateUserProfile(userId: string | number, userData: UserUpdate): Promise<UserProfile> {
-  console.log(`Updating user profile for ID ${userId} at ${API_URL}/users/${userId}`);
+  // console.log(`Updating user profile for ID ${userId} at ${API_URL}/users/${userId}`);
   return ApiClient.put(`/users/${userId}`, userData);
 }
 
@@ -299,7 +284,7 @@ export interface SubscriptionCreate { plan_id: number; }
 // Public plans endpoint - Should not require authentication
 export async function getPlans(): Promise<PlanResponse[]> {
   try {
-    console.log(`Fetching plans from: ${API_URL}/public/plans`);
+    // console.log(`Fetching plans from: ${API_URL}/public/plans`);
     // Use fetch directly to avoid sending auth token for public endpoint
     const response = await fetch(`${API_URL}/public/plans`);
     if (!response.ok) {
@@ -545,29 +530,37 @@ export async function sendMessage(doctorId: string | number, message: string, fi
   }
 }
 
+// Add DoctorResponse type if it doesn't exist
+export interface DoctorResponse {
+  id: number;
+  name: string;
+  slug: string;
+  avatar?: string;
+  specialties?: string[];
+  bio?: string;
+  experience?: string;
+  [key: string]: any;
+}
+
 // Public endpoint - Should not require authentication
-export async function getDoctors() {
+export async function getDoctors(): Promise<DoctorResponse[]> {
   try {
-    console.log(`Fetching doctors from: ${API_URL}/public/doctors`);
-    // Use fetch directly
+    // console.log(`Fetching doctors from: ${API_URL}/public/doctors`);
     const response = await fetch(`${API_URL}/public/doctors`);
-     if (!response.ok) {
-        throw new Error(`Failed to fetch public doctors: ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch doctors: ${response.status}`);
     }
-    const data = await response.json();
-    console.log('Doctors data received:', data);
-    return data;
+    return await response.json();
   } catch (error) {
     console.error('Error fetching doctors:', error);
-    return []; // Return empty array on error
+    throw error;
   }
 }
 
 // Public endpoint - Should not require authentication
 export async function getDoctorBySlug(slug: string) {
   try {
-    console.log(`Fetching doctor by slug from: ${API_URL}/doctors/public/by-slug/${slug}`);
-    // Use fetch directly
+    // console.log(`Fetching doctor by slug from: ${API_URL}/doctors/public/by-slug/${slug}`);
     const response = await fetch(`${API_URL}/doctors/public/by-slug/${slug}`);
      if (!response.ok) {
         throw new Error(`Failed to fetch doctor by slug ${slug}: ${response.status}`);
@@ -585,7 +578,7 @@ export async function getUserChats() {
     return await ApiClient.get('/chats');
   } catch (error) {
      if (error instanceof Error && error.message === 'Not authenticated') {
-          console.log('Cannot fetch chats: User not authenticated.');
+          // console.log('Cannot fetch chats: User not authenticated.');
           return []; // Return empty array if not authenticated
       }
     console.error('Error fetching user chats:', error);
@@ -604,7 +597,7 @@ export async function getChatMessages(chatId: number, skip: number = 0, limit: n
     }));
   } catch (error) {
     if (error instanceof Error && error.message === 'Not authenticated') {
-      console.log(`Cannot fetch messages for chat ${chatId}: User not authenticated.`);
+      // console.log(`Cannot fetch messages for chat ${chatId}: User not authenticated.`);
       return []; // Return empty array if not authenticated
     }
     console.error(`Error fetching messages for chat ${chatId}:`, error);
@@ -615,7 +608,7 @@ export async function getChatMessages(chatId: number, skip: number = 0, limit: n
 // Authenticated endpoint (except potentially for doctor 20)
 export async function createChat(doctorId: number) {
   try {
-    console.log(`Creating chat with doctor ID ${doctorId}`);
+    // console.log(`Creating chat with doctor ID ${doctorId}`);
     const isDecodeDoctor = doctorId === 20;
     const token = await ApiClient.getAuthToken();
 
@@ -652,11 +645,11 @@ export async function uploadChatFiles(chatId: number, files: File[], fileType: '
 
 // Analyze file (check if authentication is needed)
 // Assuming /files/analyze requires authentication based on your backend
-export async function analyzeFile(file: File): Promise<{ file_id: number; text_content: string; [key: string]: any }> {
+export async function analyzeFile(file: File): Promise<any> {
   try {
     const formData = new FormData();
     formData.append('file', file);
-    console.log("DEBUG: Analyzing file:", { fileName: file.name, fileSize: file.size });
+    // console.log("DEBUG: Analyzing file:", { fileName: file.name, fileSize: file.size });
 
     // Use ApiClient.request which handles token and FormData
     return await ApiClient.request('/files/analyze', {
@@ -675,7 +668,7 @@ export async function analyzeMultipleFiles(files: File[]): Promise<any[]> {
   try {
     const formData = new FormData();
     files.forEach(file => formData.append('files', file));
-    console.log("DEBUG: Analyzing multiple files:", { fileCount: files.length });
+    // console.log("DEBUG: Analyzing multiple files:", { fileCount: files.length });
 
     // Use ApiClient.request which handles token and FormData
     return await ApiClient.request('/files/bulk-analyze', {

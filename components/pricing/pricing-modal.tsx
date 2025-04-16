@@ -43,14 +43,14 @@ export function PricingModal({
   
   // Эффект для отображения выбранной цены при изменении периода
   useEffect(() => {
-    console.log('Selected period changed:', selectedPeriod);
+    // console.log('Selected period changed:', selectedPeriod);
     if (getPremiumPlan()) {
-      console.log('Premium plan prices:', {
-        price: getPremiumPlan()?.price,
-        price_3m: getPremiumPlan()?.price_3m,
-        price_6m: getPremiumPlan()?.price_6m,
-        price_12m: getPremiumPlan()?.price_12m
-      });
+      // console.log('Premium plan prices:', {
+      //   price: getPremiumPlan()?.price,
+      //   price_3m: getPremiumPlan()?.price_3m,
+      //   price_6m: getPremiumPlan()?.price_6m,
+      //   price_12m: getPremiumPlan()?.price_12m
+      // });
     }
   }, [selectedPeriod, strapiPlans]);
 
@@ -61,7 +61,7 @@ export function PricingModal({
       
       const response = await getStrapiPlans();
       setStrapiPlans(response.data || []);
-      console.log('Strapi plans loaded:', response.data);
+      // console.log('Strapi plans loaded:', response.data);
     } catch (error) {
       console.error('Error loading Strapi plans:', error);
       setError('Не удалось загрузить тарифные планы');
@@ -73,13 +73,13 @@ export function PricingModal({
   // Функция для получения цены в зависимости от выбранного периода
   const getPlanPrice = (plan: StrapiPlan): number => {
     // Выводим в консоль для отладки все цены
-    console.log('Plan prices:', {
-      price: plan.price,
-      price_3m: plan.price_3m,
-      price_6m: plan.price_6m,
-      price_12m: plan.price_12m,
-      selectedPeriod
-    });
+    // console.log('Plan prices:', {
+    //   price: plan.price,
+    //   price_3m: plan.price_3m,
+    //   price_6m: plan.price_6m,
+    //   price_12m: plan.price_12m,
+    //   selectedPeriod
+    // });
     
     switch (selectedPeriod) {
       case '3m':
