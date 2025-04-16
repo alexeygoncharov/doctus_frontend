@@ -63,8 +63,8 @@ const RegisterPage = () => {
   return (
     <>
       <Head>
-        <title>Регистрация | МедАссистент</title>
-        <meta name="description" content="Регистрация в сервисе МедАссистент для расшифровки медицинских анализов" />
+        <title>Регистрация | Доктус</title>
+        <meta name="description" content="Регистрация в сервисе Доктус для расшифровки медицинских анализов" />
       </Head>
 
       <div className="flex min-h-screen-minus-header">

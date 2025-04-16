@@ -102,7 +102,7 @@ export function DoctorList({
                     ${selectedDoctorId === doctor.id ? 'bg-blue-50' : ''}
                   `}
                 >
-                  <div className="relative">
+                  <div className="relative shrink-0">
                     <SimpleAvatar 
                       src={avatarSrc}
                       alt={doctor.name || 'Доктор'}
@@ -110,6 +110,7 @@ export function DoctorList({
                       width={40}
                       height={40}
                     />
+                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">

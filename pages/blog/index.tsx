@@ -38,13 +38,13 @@ const BlogPage = () => {
   return (
     <>
       <Head>
-        <title>Блог | МедАссистент</title>
+        <title>Блог | Доктус</title>
         <meta name="description" content="Медицинский блог с полезной информацией о здоровье, анализах и медицинских исследованиях" />
       </Head>
 
       <section className="py-6 md:py-15 px-4">
         <div className="max-w-320 mx-auto">
-          <h1 className="text-3xl md:text-4xl font-bold mb-6">Блог МедАссистент</h1>
+          <h1 className="text-3xl md:text-4xl font-bold mb-6">Блог Доктус</h1>
           
           {loading && (
             <div className="flex justify-center items-center min-h-[300px]">

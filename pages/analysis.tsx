@@ -195,7 +195,7 @@ export default function Analysis() {
   return (
     <>
       <Head>
-        <title>МедАссистент | Расшифровка анализов</title>
+        <title>Доктус | Расшифровка анализов</title>
         <meta name="description" content="Мгновенная расшифровка медицинских анализов с помощью ИИ - загрузите анализы и получите подробные рекомендации" />
       </Head>
 

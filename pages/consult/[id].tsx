@@ -64,7 +64,7 @@ const ConsultDetail: React.FC<ConsultDetailProps> = ({ doctorId, queryDoctor }) 
   return (
     <>
       <Head>
-        <title>Консультация с {doctor.name} | МедАссистент</title>
+        <title>Консультация с {doctor.name} | Доктус</title>
         <meta name="description" content={`Получите онлайн-консультацию от ${doctor.name}, ИИ специалиста по ${doctor.specialty.toLowerCase()}`} />
       </Head>
 

@@ -26,7 +26,7 @@ const BlogPost: React.FC<BlogPostProps> = ({ post }) => {
   return (
     <>
       <Head>
-        <title>{title} | МедАссистент</title>
+        <title>{title} | Доктус</title>
         <meta name="description" content={post.summary || content.substring(0, 160)} />
       </Head>
 

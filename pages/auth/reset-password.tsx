@@ -71,8 +71,8 @@ export default function ResetPassword() {
   return (
     <>
       <Head>
-        <title>Сброс пароля | МедАссистент</title>
-        <meta name="description" content="Сброс пароля МедАссистент" />
+        <title>Сброс пароля | Доктус</title>
+        <meta name="description" content="Сброс пароля Доктус" />
       </Head>
       
       <div className="flex min-h-screen-minus-header">

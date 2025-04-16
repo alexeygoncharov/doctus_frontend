@@ -125,10 +125,45 @@ const Header: React.FC = () => {
       <div className="max-w-320 w-full mx-auto">
         <nav className="flex items-center justify-between py-3.5 sm:py-4 gap-2" aria-label="Global">
           {/* Logo */}
-          <div className="flex flex-1 lg:flex-initial">
-            <Link href="/" className="flex flex-row items-center gap-1.5 lg:gap-2 header-logo min-w-0 lg:min-w-52">
-              <Image className="h-6 sm:h-7.5 lg:h-8 w-auto basis-1/3" src="/img/logo.svg" alt="Logo" width={32} height={32} />
-              <span className="text-lg sm:text-xl lg:text-2xl">МедАссистент</span>
+          <div style={{ position: 'relative', width: 'auto', minWidth: '0', flex: 'none' }}>
+            <Link href="/" className="block" style={{ position: 'relative', display: 'block', width: 'auto', height: '32px' }}>
+              <span style={{
+                position: 'absolute',
+                left: 0,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                display: 'flex',
+                alignItems: 'center',
+                height: '32px',
+                whiteSpace: 'nowrap'
+              }}>
+                <Image
+                  src="/img/logo.svg"
+                  alt="Logo"
+                  width={32}
+                  height={32}
+                  style={{
+                    display: 'inline-block',
+                    verticalAlign: 'middle',
+                    width: '32px',
+                    height: '32px',
+                    minWidth: '32px',
+                    minHeight: '32px'
+                  }}
+                />
+                <span
+                  style={{
+                    display: 'inline-block',
+                    marginLeft: '10px',
+                    fontSize: '22px',
+                    lineHeight: '32px',
+                    fontWeight: 500,
+                    color: '#1B1B1B'
+                  }}
+                >
+                  Доктус
+                </span>
+              </span>
             </Link>
           </div>
 

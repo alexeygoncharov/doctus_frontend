@@ -107,10 +107,10 @@ const Footer: React.FC = () => {
           <div className="md:max-w-64">
             <Link href="/" className="flex flex-row items-center justify-center md:justify-start gap-1.5 lg:gap-2 header-logo min-w-0 lg:min-w-52">
               <Image className="h-7.5 lg:h-8 w-auto" src="/img/logo.png" alt="Logo" width={32} height={32} />
-              <span className="text-xl lg:text-2xl text-white">МедАссистент</span>
+              <span className="text-xl lg:text-2xl text-white">Доктус</span>
             </Link>
             <p className="text-xs md:text-sm lg:text-base text-gray-300 text-center md:text-left mt-3.5 md:mt-6">
-              МедАссистент - ваш надежный помощник в вопросах здоровья и медицинской информации.
+              Доктус - ваш надежный помощник в вопросах здоровья и медицинской информации.
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 grow gap-3.5 sm:gap-2 w-full md:w-auto">
@@ -205,9 +205,13 @@ const Footer: React.FC = () => {
         </div>
         <div className="mt-8 pt-8 md:pt-11 border-t border-solid border-gray-700">
           <p className="mx-auto text-left md:text-center max-w-190.5 w-full text-xs leading-4.5 text-gray-400">
-            Внимание: Сервис МедАссистент предоставляет исключительно информационные услуги и не является заменой консультации с квалифицированным медицинским специалистом. Информация, предоставляемая сервисом, не является медицинской консультацией или диагнозом. Для получения медицинской помощи и конкретных рекомендаций по лечению обязательно обратитесь к врачу.
+            Внимание: Сервис Доктус предоставляет исключительно информационные услуги и не является заменой консультации с квалифицированным медицинским специалистом. Информация, предоставляемая сервисом, не является медицинской консультацией или диагнозом. Для получения медицинской помощи и конкретных рекомендаций по лечению обязательно обратитесь к врачу.
           </p>
-          <p className="mt-7.5 md:mt-11 text-white md:text-center text-sm leading-6 md:text-base">© 2026 МедАссистент. Все права защищены.</p>
+          <p className="mt-7.5 md:mt-11 text-white md:text-center text-sm leading-6 md:text-base">© {new Date().getFullYear()} Доктус. Все права защищены.</p>
+          <p className="mt-4 text-xs text-gray-400 md:text-center">
+            Гончаров Алексей Валерьевич<br />
+            ИНН 261005692030
+          </p>
         </div>
       </div>
     </footer>

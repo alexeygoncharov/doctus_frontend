@@ -43,8 +43,8 @@ export default function ForgotPassword() {
   return (
     <>
       <Head>
-        <title>Восстановление пароля | МедАссистент</title>
-        <meta name="description" content="Восстановление пароля МедАссистент" />
+        <title>Восстановление пароля | Доктус</title>
+        <meta name="description" content="Восстановление пароля Доктус" />
       </Head>
 
       <div className="flex min-h-screen-minus-header">

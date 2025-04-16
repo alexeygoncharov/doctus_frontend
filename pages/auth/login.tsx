@@ -73,8 +73,8 @@ const LoginPage = () => {
   return (
     <>
       <Head>
-        <title>Вход | МедАссистент</title>
-        <meta name="description" content="Вход в сервис МедАссистент для расшифровки медицинских анализов" />
+        <title>Вход | Доктус</title>
+        <meta name="description" content="Вход в сервис Доктус для расшифровки медицинских анализов" />
       </Head>
 
       <div className="flex min-h-screen-minus-header">

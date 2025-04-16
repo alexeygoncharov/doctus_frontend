@@ -4,15 +4,14 @@ import React, { forwardRef, useContext, useState, useEffect, useRef } from "reac
 import { FileData, Message } from "../../lib/types";
 import { SimpleAvatar } from "@/components/ui/SimpleAvatar";
 import { Doctor } from "../../lib/doctors";
-import { User } from "lucide-react";
 import { FileMessage } from "./file-message";
 import { ImageMessage } from "./image-message";
-import { AvatarContext } from "../../pages/_app";
 import { getBackendUrl } from "../../lib/api";
 import { cacheImageData, getCachedImageData } from "@/lib/utils";
 import { Spinner } from "../ui/spinner";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/lib/auth-context";
+import { useSession } from 'next-auth/react';
+import Image from 'next/image';
 
 interface ChatMessageProps {
   doctor: Doctor | null;
@@ -41,9 +40,50 @@ export const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
   // Убираем отладочный вывод
   // console.log(`Message: ${message.content.substring(0, 20)}... | Role: ${message.role} | isUser: ${isUser}`);
   
-  const { avatarUrl } = useContext(AvatarContext);
-  const { user } = useAuth();
-  
+  // Получаем сессию
+  const { data: session } = useSession();
+  const user = session?.user;
+
+  // State for local avatar URL (из localStorage)
+  const [localAvatarUrl, setLocalAvatarUrl] = useState<string | null>(null);
+
+  // Load avatar from localStorage on first render
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedAvatar = localStorage.getItem('userAvatar');
+      if (storedAvatar && !user?.avatar) {
+        setLocalAvatarUrl(storedAvatar);
+      }
+    }
+  }, []); // Убираем user?.avatar из зависимостей, чтобы localStorage читался только раз
+
+  // Update local avatar if user avatar changes in session
+  useEffect(() => {
+    if (user?.avatar) {
+      setLocalAvatarUrl(user.avatar);
+      if (typeof window !== 'undefined') {
+          localStorage.setItem('userAvatar', user.avatar);
+      }
+    }
+  }, [user?.avatar]);
+
+  // Determine the avatar URL from session, localStorage or fallback
+  const avatarFromUser = user?.avatar ? String(user.avatar) : null;
+  const avatarFromLocal = localAvatarUrl ? String(localAvatarUrl) : null;
+
+  // Determine the avatar URL
+  let currentAvatarUrl = null;
+
+  if (avatarFromUser) {
+    currentAvatarUrl = avatarFromUser.startsWith('http')
+      ? avatarFromUser
+      : getBackendUrl(avatarFromUser);
+  } else if (avatarFromLocal) {
+    currentAvatarUrl = avatarFromLocal.startsWith('http')
+      ? avatarFromLocal
+      : getBackendUrl(avatarFromLocal);
+  }
+
   // Преобразуем timestamp в объект Date, если это необходимо
   const timestamp = message.timestamp instanceof Date ? message.timestamp : new Date(message.timestamp);
   
@@ -364,15 +404,26 @@ export const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
 
       {/* User Avatar - только для сообщений от пользователя (справа) */}
       {isUser && (
-         <div className="relative h-8 w-8 sm:h-10 sm:w-10 shrink-0">
-           <SimpleAvatar
-             src={message.userAvatar || user?.avatar || avatarUrl || undefined}
-             alt="User"
-             fallbackText={user?.name ? user.name.charAt(0) : 'U'}
-             className="h-full w-full"
-           />
-         </div>
-       )}
+        <div className="relative flex items-center justify-center shrink-0 overflow-hidden rounded-full h-8 w-8">
+           {currentAvatarUrl ? (
+             <Image
+               alt="Аватар пользователя"
+               src={currentAvatarUrl}
+               layout="fill"
+               objectFit="cover"
+               className="aspect-square h-full w-full"
+             />
+           ) : (
+             <SimpleAvatar
+               src={user?.avatar ?? undefined}
+               alt={user?.name ?? user?.email ?? "User"}
+               fallbackText={user?.name ?? user?.email ?? undefined}
+               width={32}
+               height={32}
+             />
+           )}
+        </div>
+      )}
     </div>
   );
 });

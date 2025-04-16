@@ -543,8 +543,8 @@ const SettingsPage = () => {
   return (
     <>
       <Head>
-        <title>Настройки | МедАссистент</title>
-        <meta name="description" content="Управление настройками вашего аккаунта МедАссистент" />
+        <title>Настройки | Доктус</title>
+        <meta name="description" content="Управление настройками вашего аккаунта Доктус" />
       </Head>
       
       {/* Модальное окно с тарифами */}
