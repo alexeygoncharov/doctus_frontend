@@ -33,4 +33,9 @@ yarn-error.log*
 next-env.d.ts
 
 # archives
-*.zip 
+# archives
+*.zip
+
+# Backup artifacts (remove backup folder and zip)
+backup/
+BACKUP.zip
