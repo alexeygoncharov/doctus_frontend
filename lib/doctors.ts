@@ -35,7 +35,7 @@ export function mapApiDoctorToUi(doctor: any): Doctor {
               avatarPath = url.pathname;
               break;
            }
-         } catch (e) { /* Игнорируем ошибки парсинга URL */ }
+         } catch { /* Игнорируем ошибки парсинга URL */ }
        } else {
          // Логируем неожиданный формат, но продолжаем поиск в potentialPaths
          // console.warn(`Doctor ${doctor.id}: Unexpected avatar path format: ${path}`);

@@ -284,12 +284,23 @@ export const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
     const formattedText = formatText(streamedContent);
     
     if (!isCurrentlyStreaming) {
-      // Если стриминг завершен, показываем текст с поддержкой HTML
+      // Если стриминг завершен, показываем текст с поддержкой HTML и плавным фейд-ином
       return (
-        <div 
-          className="whitespace-pre-wrap break-words markdown-formatted"
+        <div
+          className="whitespace-pre-wrap break-words markdown-formatted fade-in"
           dangerouslySetInnerHTML={{ __html: formattedText }}
         />
+      );
+    }
+    // Если стриминг начался, но еще нет контента, показываем индикатор печати
+    if (isCurrentlyStreaming && formattedText.trim() === "") {
+      // Показ трех анимированных точек вместо спиннера
+      return (
+        <div className="typing-dots text-gray-500 italic">
+          <span />
+          <span />
+          <span />
+        </div>
       );
     }
     
@@ -376,16 +387,15 @@ export const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
           </div>
         )}
 
-        {/* Text content - Now without background/border styles itself */}
-        {hasTextContent && (
+        {/* Text content or streaming status */}
+        {(hasTextContent || isCurrentlyStreaming) && (
           <div className={cn(
             'whitespace-pre-wrap break-words markdown-formatted',
-             // Add margin only if files are present above
-             (hasImageFiles() || hasNonImageFiles()) ? 'mt-1' : '',
-             // Apply padding here IF files are present (since the outer div won't have it)
-             (hasImageFiles() || hasNonImageFiles()) ? 'px-3 py-2 sm:px-4' : ''
-             // Text color applied conditionally if needed (depends on outer div style)
-             // isUser ? 'text-white' : 'text-[#334155]' // Potentially needed if outer div bg changes
+            // Add margin only if files are present above
+            (hasImageFiles() || hasNonImageFiles()) ? 'mt-1' : '',
+            // Apply padding here IF files are present (since the outer div won't have it)
+            (hasImageFiles() || hasNonImageFiles()) ? 'px-3 py-2 sm:px-4' : ''
+            // Text color applied conditionally if needed (depends on outer div style)
           )}>
             {renderStreamingText()}
           </div>

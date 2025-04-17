@@ -192,7 +192,7 @@ export function DoctorChat({ initialDoctorId }: DoctorChatProps = {}) {
   };
 
   return (
-    <div className="h-[650px] md:h-[75vh] lg:h-[80vh] w-full border rounded-lg overflow-hidden flex flex-col md:flex-row relative bg-background">
+    <div className="h-[650px] md:h-[75vh] lg:h-[80vh] w-full border rounded-lg overflow-hidden flex flex-col md:flex-row relative bg-background z-10">
       {/* Doctor list sidebar */}
       <div 
         className={`

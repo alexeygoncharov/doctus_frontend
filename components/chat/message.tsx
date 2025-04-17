@@ -24,7 +24,9 @@ export function Message({
       <SimpleAvatar 
         src={userAvatar ?? undefined}
         fallbackText={role === "user" ? "Y" : "A"}
-        size={32}
+        width={32}
+        height={32}
+        alt={role === "user" ? "Пользователь" : "Ассистент"}
         className={cn(
           isLoading && "animate-pulse"
         )}

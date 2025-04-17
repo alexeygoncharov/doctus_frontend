@@ -380,7 +380,7 @@ export async function getCurrentSubscription(): Promise<SubscriptionResponse | n
       }
       // Throw error if it's not a recognized "not found" message
       throw new Error(errorBody?.detail || `Subscription fetch failed with status ${response.status}`);
-    } catch (parseError) {
+    } catch {
        // If reading JSON fails, throw a generic error
        throw new Error(`Subscription fetch failed with status ${response.status}`);
     }
@@ -484,19 +484,7 @@ export async function sendMessage(doctorId: string | number, message: string, fi
         throw new Error("Требуется авторизация для отправки сообщений этому доктору.");
       }
 
-      // Use fetch directly for streaming response handling
-      const response = await fetch(streamUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(messageData),
-        mode: 'cors'
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Error sending message: ${response.status} - ${errorText}`);
-      }
-
+      // Prepare streaming message placeholder
       const streamingMessage: Message = {
         id: messageId,
         role: "assistant",
@@ -504,41 +492,50 @@ export async function sendMessage(doctorId: string | number, message: string, fi
         timestamp: new Date(),
         isStreaming: true,
       };
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("Не удалось получить reader для потока.");
-
-      // Process stream in background, return initial message object immediately
+      // Start streaming in background without blocking
       (async () => {
+        try {
+          const response = await fetch(streamUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(messageData),
+            mode: 'cors',
+          });
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Error sending message: ${response.status} - ${errorText}`);
+          }
+          const reader = response.body?.getReader();
+          if (!reader) throw new Error("Не удалось получить reader для потока.");
           const decoder = new TextDecoder();
           let done = false;
           let fullResponse = "";
-          try {
-              while (!done) {
-                  const { value, done: doneReading } = await reader.read();
-                  done = doneReading;
-                  if (value) {
-                      const chunk = decoder.decode(value, { stream: true });
-                      fullResponse += chunk;
-                      // Dispatch update event
-                      window.dispatchEvent(new CustomEvent('chat-message-update', {
-                          detail: { id: messageId, content: fullResponse }
-                      }));
-                      await new Promise(resolve => setTimeout(resolve, 30)); // Small delay
-                  }
-              }
-              // Dispatch final event
-              window.dispatchEvent(new CustomEvent('chat-message-complete', {
-                  detail: { id: messageId, content: fullResponse, isStreaming: false }
+          while (!done) {
+            const { value, done: doneReading } = await reader.read();
+            done = doneReading;
+            if (value) {
+              const chunk = decoder.decode(value, { stream: true });
+              fullResponse += chunk;
+              window.dispatchEvent(new CustomEvent('chat-message-update', {
+                detail: { id: messageId, content: fullResponse },
               }));
-          } catch (error) {
-               console.error("Error processing stream:", error);
-               window.dispatchEvent(new CustomEvent('chat-message-error', {
-                   detail: { id: messageId, error: error instanceof Error ? error.message : 'Ошибка обработки потока' }
-               }));
+              // Throttle updates slightly
+              await new Promise(resolve => setTimeout(resolve, 30));
+            }
           }
+          window.dispatchEvent(new CustomEvent('chat-message-complete', {
+            detail: { id: messageId, content: fullResponse, isStreaming: false },
+          }));
+        } catch (error) {
+          console.error("Error processing stream:", error);
+          window.dispatchEvent(new CustomEvent('chat-message-error', {
+            detail: {
+              id: messageId,
+              error: error instanceof Error ? error.message : 'Ошибка обработки потока',
+            },
+          }));
+        }
       })();
-
       return streamingMessage;
     } else {
       // Для неавторизованных пользователей - симулируем backend-ответ

@@ -164,7 +164,7 @@ const Header: React.FC = () => {
                    <path d="M4.48091 6.97379C4.22056 7.23413 4.22056 7.65627 4.48091 7.9166L7.74237 11.1749C8.26317 11.6951 9.10704 11.6949 9.62757 11.1745L12.8878 7.9142C13.1482 7.65387 13.1482 7.23173 12.8878 6.97139C12.6274 6.71103 12.2053 6.71103 11.945 6.97139L9.15457 9.7618C8.89424 10.0222 8.4721 10.0221 8.21177 9.7618L5.42372 6.97379C5.16337 6.71344 4.74126 6.71344 4.48091 6.97379Z"/>
                  </svg>
                </Link>
-               <ul className="absolute left-1/2 -translate-x-1/2 z-10 w-fit text-nowrap rounded-md bg-white ring-1 shadow-lg ring-black/5 focus:outline-hidden opacity-0 invisible group-hover/items:opacity-100 group-hover/items:visible transition-all">
+               <ul className="absolute left-1/2 -translate-x-1/2 z-30 w-fit text-nowrap rounded-md bg-white ring-1 shadow-lg ring-black/5 focus:outline-hidden opacity-0 invisible group-hover/items:opacity-100 group-hover/items:visible transition-all">
                  {doctors.length > 0 ? (
                    doctors.map((doctor) => (
                      <li key={doctor.id}>

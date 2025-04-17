@@ -9,6 +9,7 @@ import { ScrollArea } from "../../components/ui/scroll-area";
 import { SearchDoctors } from "./search-doctors";
 import { SimpleAvatar } from "@/components/ui/SimpleAvatar";
 import { PlusBadge } from "./plus-badge";
+import Link from "next/link";
 
 interface DoctorListProps {
   onSelectDoctor: (doctor: Doctor) => void;
@@ -92,15 +93,16 @@ export function DoctorList({
                 : doctor.avatar;
                 
               return (
-                <button
+                <Link
                   key={doctor.id}
-                  type="button"
+                  href={`/doctor/${doctor.slug || doctor.id}`}
                   onClick={() => onSelectDoctor(doctor)}
                   className={`
                     w-full text-left p-2 flex items-center space-x-3 
                     rounded-lg hover:bg-muted
                     ${selectedDoctorId === doctor.id ? 'bg-blue-50' : ''}
                   `}
+                  passHref
                 >
                   <div className="relative shrink-0">
                     <SimpleAvatar 
@@ -119,7 +121,7 @@ export function DoctorList({
                     </div>
                     <p className="text-xs truncate text-gray-500">{doctor.description}</p>
                   </div>
-                </button>
+                </Link>
               );
             })}
             

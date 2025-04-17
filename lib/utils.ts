@@ -41,25 +41,6 @@ export function formatDate(dateString: string): string {
 }
 
 /**
- * Конвертирует HEIC изображение в JPEG
- */
-async function convertHeicToJpeg(blob: Blob): Promise<Blob> {
-  // Динамический импорт heic2any
-  const heic2any = (await import('heic2any')).default;
-  try {
-    const convertedBlob = await heic2any({
-      blob,
-      toType: "image/jpeg",
-      quality: 0.8
-    });
-    return convertedBlob as Blob;
-  } catch (error) {
-    console.error('Ошибка конвертации HEIC в JPEG:', error);
-    throw error;
-  }
-}
-
-/**
  * Сохраняет данные в IndexedDB (используя idb)
  */
 export async function saveToIndexedDB(storeName: string, key: string, value: string): Promise<void> {
