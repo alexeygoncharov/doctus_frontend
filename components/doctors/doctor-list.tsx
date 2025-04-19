@@ -9,7 +9,7 @@ import { ScrollArea } from "../../components/ui/scroll-area";
 import { SearchDoctors } from "./search-doctors";
 import { SimpleAvatar } from "@/components/ui/SimpleAvatar";
 import { PlusBadge } from "./plus-badge";
-import Link from "next/link";
+import { useRouter } from "next/router";
 
 interface DoctorListProps {
   onSelectDoctor: (doctor: Doctor) => void;
@@ -39,6 +39,8 @@ export function DoctorList({
   const handleFilterDoctors = (filtered: Doctor[]) => {
     setFilteredDoctors(filtered);
   };
+  const router = useRouter();
+  const isDoctorPage = router.pathname === '/doctor/[slug]';
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -88,24 +90,30 @@ export function DoctorList({
         ) : (
           <div className="p-3 space-y-2">
             {filteredDoctors.map((doctor) => {
-              const avatarSrc = doctor.avatar.startsWith('/uploads/') 
-                ? `${process.env.NEXT_PUBLIC_BACKEND_URL}${doctor.avatar}` 
+              const avatarSrc = doctor.avatar.startsWith('/uploads/')
+                ? `${process.env.NEXT_PUBLIC_BACKEND_URL}${doctor.avatar}`
                 : doctor.avatar;
-                
+              const targetPath = `/doctor/${doctor.slug || doctor.id}`;
               return (
-                <Link
+                <button
                   key={doctor.id}
-                  href={`/doctor/${doctor.slug || doctor.id}`}
-                  onClick={() => onSelectDoctor(doctor)}
-                  className={`
-                    w-full text-left p-2 flex items-center space-x-3 
-                    rounded-lg hover:bg-muted
-                    ${selectedDoctorId === doctor.id ? 'bg-blue-50' : ''}
-                  `}
-                  passHref
+                  type="button"
+                  onClick={(e) => {
+                    onSelectDoctor(doctor);
+                    if (isDoctorPage) {
+                      e.preventDefault();
+                      router.push(targetPath, undefined, { shallow: true });
+                    } else {
+                      router.push(targetPath);
+                    }
+                  }}
+                  className={
+                    `w-full text-left p-2 flex items-center space-x-3 rounded-lg hover:bg-muted
+                    ${selectedDoctorId === doctor.id ? 'bg-blue-50' : ''}`
+                  }
                 >
                   <div className="relative shrink-0">
-                    <SimpleAvatar 
+                    <SimpleAvatar
                       src={avatarSrc}
                       alt={doctor.name || 'Доктор'}
                       fallbackText={doctor.name ?? undefined}
@@ -121,7 +129,7 @@ export function DoctorList({
                     </div>
                     <p className="text-xs truncate text-gray-500">{doctor.description}</p>
                   </div>
-                </Link>
+                </button>
               );
             })}
             
